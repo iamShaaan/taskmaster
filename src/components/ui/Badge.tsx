@@ -7,17 +7,17 @@ interface BadgeProps {
 }
 
 const variantMap = {
-    indigo: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-    emerald: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    amber: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    red: 'bg-red-500/15 text-red-400 border-red-500/30',
-    slate: 'bg-slate-700/50 text-slate-400 border-slate-600',
-    purple: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+    indigo: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20 shadow-[0_0_15px_-3px_rgba(99,102,241,0.2)]',
+    emerald: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]',
+    amber: 'bg-amber-500/10 text-amber-300 border-amber-500/20 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]',
+    red: 'bg-red-500/10 text-red-300 border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]',
+    slate: 'bg-slate-700/30 text-slate-300 border-slate-600/50',
+    purple: 'bg-purple-500/10 text-purple-300 border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)]',
 };
 
 export const Badge: React.FC<BadgeProps> = ({ label, variant = 'slate', size = 'sm' }) => (
     <span
-        className={`inline-flex items-center border rounded-full font-medium ${variantMap[variant]} ${size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'
+        className={`inline-flex items-center border rounded-md font-semibold tracking-wide ${variantMap[variant]} ${size === 'sm' ? 'px-2 py-0.5 text-[10px] uppercase' : 'px-3 py-1 text-xs uppercase'
             }`}
     >
         {label}
