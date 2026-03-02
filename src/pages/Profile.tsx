@@ -12,6 +12,16 @@ import toast from 'react-hot-toast';
 import { useAppStore } from '../store';
 import type { UserProfile } from '../types';
 
+// Safe URL hostname extractor - never throws
+const getHostname = (url: string): string => {
+    try {
+        const u = url.startsWith('http') ? url : `https://${url}`;
+        return new URL(u).hostname;
+    } catch {
+        return url || 'None linked';
+    }
+};
+
 export const Profile: React.FC = () => {
     const { user } = useAuth();
     const { tasks, projects, meetings } = useAppStore();
@@ -147,7 +157,7 @@ export const Profile: React.FC = () => {
         </div>
     );
 
-    const DashboardView = () => (
+    const DashboardView = React.memo(() => (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Header / Hero Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -287,7 +297,7 @@ export const Profile: React.FC = () => {
                                 <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Portfolio Nexus</span>
                                 <div className="flex items-center gap-3 text-slate-200 font-bold bg-slate-950/40 p-3 rounded-2xl border border-white/5">
                                     <ExternalLink size={14} className="text-slate-500" />
-                                    <span className="text-xs truncate">{profile.websites?.[0] ? new URL(profile.websites[0]).hostname : "None linked"}</span>
+                                    <span className="text-xs truncate">{profile.websites?.[0] ? getHostname(profile.websites[0]) : "None linked"}</span>
                                 </div>
                             </div>
                         </div>
@@ -342,9 +352,10 @@ export const Profile: React.FC = () => {
                 </div>
             </div>
         </div>
-    );
+    ));
+    DashboardView.displayName = 'DashboardView';
 
-    const EditView = () => (
+    const EditView = React.memo(() => (
         <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-300">
             <div className="flex items-center justify-between mb-8">
                 <div>
@@ -540,7 +551,8 @@ export const Profile: React.FC = () => {
                 </div>
             </div>
         </div>
-    );
+    ));
+    EditView.displayName = 'EditView';
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
