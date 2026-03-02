@@ -19,7 +19,6 @@ import { Sparkles } from 'lucide-react';
 import { ClientDetail } from './pages/ClientDetail';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Profile } from './pages/Profile';
-import { InviteAccept } from './pages/InviteAccept';
 
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -82,7 +81,7 @@ const DataLoader: React.FC = () => {
       } as unknown as Project)));
     }, where('owner_id', '==', user.uid)));
 
-    // Second listener for shared projects
+    // Second listener: projects shared with this user (member_uids array-contains)
     unsubs.push(listenCollection('projects', (data) => {
       const sharedProjects = data.map((d) => ({
         ...d,
@@ -94,10 +93,8 @@ const DataLoader: React.FC = () => {
         })),
       } as unknown as Project));
 
-      // We need to merge this with the owned projects in the store. 
-      // This requires a store update to handle merging instead of just setting.
       setProjects([...useAppStore.getState().projects, ...sharedProjects].filter((p, i, a) => a.findIndex(t => t.id === p.id) === i));
-    }, where('shared_with', 'array-contains', user.uid)));
+    }, where('member_uids', 'array-contains', user.uid)));
 
     return () => unsubs.forEach((u) => u());
   }, [user, setTasks, setMeetings, setClients, setProjects, setNotes]);
@@ -133,8 +130,6 @@ function App() {
         }}
       />
       <Routes>
-        {/* Public invite route — accessible without auth */}
-        <Route path="/invite" element={<InviteAccept />} />
         {!user ? (
           <Route path="*" element={<Auth />} />
         ) : (

@@ -299,74 +299,98 @@ export const ProjectDetail: React.FC = () => {
     );
 };
 
+const ROLE_CONFIG = {
+    admin: { label: 'Admin', color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' },
+    moderator: { label: 'Moderator', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+    viewer: { label: 'Viewer', color: 'bg-slate-700/50 text-slate-300 border-slate-600/30' },
+};
+
 const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
-    const [email, setEmail] = useState('');
-    const [inviting, setInviting] = useState(false);
-    const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
+    const [emailLabel, setEmailLabel] = useState('');
+    const [userCode, setUserCode] = useState('');
+    const [role, setRole] = useState<'admin' | 'moderator' | 'viewer'>('moderator');
+    const [adding, setAdding] = useState(false);
     const isOwner = auth.currentUser?.uid === project.owner_id;
 
-    const handleSendInvite = async () => {
-        if (!email.trim()) return;
-        const emailLower = email.trim().toLowerCase();
+    const handleAddMember = async () => {
+        if (!userCode.trim()) { toast.error('Enter a User Code'); return; }
 
-        if (project.pending_invites?.includes(emailLower)) {
-            toast.error('An invite was already sent to this email');
-            return;
-        }
-
-        setInviting(true);
+        setAdding(true);
         try {
-            const { addDoc, collection, doc, setDoc, serverTimestamp: sts } = await import('firebase/firestore');
-            const { db: firestoreDb, APP_ID: appId } = await import('../firebase/config');
+            const { searchByUserCode, updateDocById: update } = await import('../firebase/firestore');
+            const results = await searchByUserCode(userCode.trim());
 
-            const user = auth.currentUser!;
-            const token = Array.from(crypto.getRandomValues(new Uint8Array(24)))
-                .map(b => b.toString(16).padStart(2, '0')).join('');
+            if (results.length === 0) {
+                toast.error('No user found with that code. Ask them to check their Profile page.');
+                return;
+            }
 
-            const expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + 7);
+            const found = results[0];
+            const targetUid: string = found.uid || found.id;
 
-            const inviteRef = doc(firestoreDb, `apps/${appId}/invitations/${token}`);
-            await setDoc(inviteRef, {
-                token,
-                project_id: project.id,
-                project_name: project.name,
-                invited_email: emailLower,
-                invited_by: user.uid,
-                invited_by_name: user.displayName || user.email,
-                status: 'pending',
-                created_at: sts(),
-                expires_at: expiresAt,
+            // Prevent duplicate
+            if (targetUid === project.owner_id) { toast.error('That user is already the project owner'); return; }
+            const existing: string[] = project.member_uids || project.shared_with || [];
+            if (existing.includes(targetUid)) { toast.error('This user is already a team member'); return; }
+
+            // Build updated arrays
+            const newMember = {
+                uid: targetUid,
+                email: emailLabel.trim() || found.email || found.personalEmail || '',
+                role,
+                added_at: new Date(),
+            };
+            const updatedMembers = [...(project.members || []), newMember];
+            const updatedMemberUids = [...existing, targetUid];
+            const updatedAdminUids = role === 'admin'
+                ? [...(project.admin_uids || []), targetUid] : (project.admin_uids || []);
+            const updatedModeratorUids = role === 'moderator'
+                ? [...(project.moderator_uids || []), targetUid] : (project.moderator_uids || []);
+            const updatedViewerUids = role === 'viewer'
+                ? [...(project.viewer_uids || []), targetUid] : (project.viewer_uids || []);
+
+            await update('projects', project.id, {
+                members: updatedMembers,
+                member_uids: updatedMemberUids,
+                admin_uids: updatedAdminUids,
+                moderator_uids: updatedModeratorUids,
+                viewer_uids: updatedViewerUids,
             });
 
-            const inviteLink = `${window.location.origin}/invite?token=${token}`;
-
-            await addDoc(collection(firestoreDb, `apps/${appId}/actions`), {
-                action_type: 'send_invitation_email',
-                payload: {
-                    to_email: emailLower,
-                    invite_link: inviteLink,
-                    project_name: project.name,
-                    invited_by_name: user.displayName || user.email,
-                },
-                status: 'pending',
-                created_at: sts(),
-                owner_id: user.uid,
-            });
-
-            const updatedPending = [...(project.pending_invites || []), emailLower];
-            await updateDocById('projects', project.id, { pending_invites: updatedPending });
-
-            setLastInviteLink(inviteLink);
-            setEmail('');
-            toast.success(`Invite created for ${emailLower}`);
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to send invite');
+            setEmailLabel('');
+            setUserCode('');
+            toast.success(`Added ${found.displayName || found.email || 'member'} as ${role}`);
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to add member');
         } finally {
-            setInviting(false);
+            setAdding(false);
         }
     };
+
+    const handleRemoveMember = async (targetUid: string) => {
+        try {
+            const { updateDocById: update } = await import('../firebase/firestore');
+            const updatedMembers = (project.members || []).filter((m: any) => m.uid !== targetUid);
+            const updatedMemberUids = (project.member_uids || []).filter((u: string) => u !== targetUid);
+            const updatedAdminUids = (project.admin_uids || []).filter((u: string) => u !== targetUid);
+            const updatedModeratorUids = (project.moderator_uids || []).filter((u: string) => u !== targetUid);
+            const updatedViewerUids = (project.viewer_uids || []).filter((u: string) => u !== targetUid);
+
+            await update('projects', project.id, {
+                members: updatedMembers,
+                member_uids: updatedMemberUids,
+                admin_uids: updatedAdminUids,
+                moderator_uids: updatedModeratorUids,
+                viewer_uids: updatedViewerUids,
+            });
+            toast.success('Member removed');
+        } catch {
+            toast.error('Failed to remove member');
+        }
+    };
+
+    const members: any[] = project.members || [];
 
     return (
         <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6">
@@ -375,77 +399,99 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
             </h2>
 
             {isOwner && (
-                <div className="mb-6 space-y-3">
-                    <div className="flex gap-2">
+                <div className="mb-6 space-y-3 p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Add Member by User Code</p>
+
+                    <div className="grid grid-cols-2 gap-2">
                         <input
                             type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSendInvite()}
-                            placeholder="Invite by email..."
-                            className="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
+                            value={emailLabel}
+                            onChange={(e) => setEmailLabel(e.target.value)}
+                            placeholder="Email (label only)"
+                            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
                         />
-                        <button
-                            onClick={handleSendInvite}
-                            disabled={inviting || !email.trim()}
-                            className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
-                        >
-                            {inviting ? '...' : 'Invite'}
-                        </button>
+                        <input
+                            type="text"
+                            value={userCode}
+                            onChange={(e) => setUserCode(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
+                            placeholder="TM-XXXXXX (User Code)"
+                            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-all"
+                        />
                     </div>
 
-                    {lastInviteLink && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1.5">
-                            <p className="text-emerald-400 text-xs font-bold">✓ Invite ready — share this link:</p>
-                            <div className="flex items-center gap-2">
-                                <code className="text-emerald-300 text-[10px] break-all flex-1 bg-black/20 px-2 py-1.5 rounded-lg">{lastInviteLink}</code>
-                                <button
-                                    onClick={() => { navigator.clipboard.writeText(lastInviteLink); toast.success('Copied!'); }}
-                                    className="text-emerald-400 hover:text-emerald-300 text-xs font-bold px-2 py-1.5 bg-emerald-500/20 rounded-lg transition-colors shrink-0"
-                                >
-                                    Copy
-                                </button>
-                            </div>
-                            <p className="text-slate-500 text-[10px]">Link expires in 7 days. Email delivery needs n8n setup.</p>
-                        </div>
-                    )}
+                    <div className="flex gap-2">
+                        <select
+                            value={role}
+                            onChange={(e) => setRole(e.target.value as any)}
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
+                        >
+                            <option value="admin">Admin — Full control</option>
+                            <option value="moderator">Moderator — Add & edit, no delete</option>
+                            <option value="viewer">Viewer — Read only + status changes</option>
+                        </select>
+                        <button
+                            onClick={handleAddMember}
+                            disabled={adding || !userCode.trim()}
+                            className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all"
+                        >
+                            {adding ? '...' : 'Add'}
+                        </button>
+                    </div>
+                    <p className="text-slate-600 text-[10px]">The member's User Code is shown on their Profile page.</p>
                 </div>
             )}
 
-            <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
+            <div className="space-y-2">
+                {/* Owner row */}
+                <div className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-indigo-500/20">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">O</div>
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/30 text-indigo-300 flex items-center justify-center font-bold text-xs">O</div>
                         <div>
-                            <p className="text-slate-200 text-sm font-medium">Project Owner</p>
+                            <p className="text-slate-200 text-sm font-medium">Project Owner {auth.currentUser?.uid === project.owner_id ? '(You)' : ''}</p>
                             <p className="text-slate-500 text-[10px]">Full Access</p>
                         </div>
                     </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-indigo-500/20 text-indigo-300 border-indigo-500/30">Owner</span>
                 </div>
-                {project.shared_with?.map((uid: string) => (
-                    <div key={uid} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">T</div>
-                            <div>
-                                <p className="text-slate-200 text-sm font-medium">Team Member</p>
-                                <p className="text-slate-500 text-[10px]">{uid === auth.currentUser?.uid ? 'You' : 'Collaborator'}</p>
+
+                {/* Members */}
+                {members.map((m: any) => {
+                    const cfg = ROLE_CONFIG[m.role as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.viewer;
+                    const isYou = m.uid === auth.currentUser?.uid;
+                    return (
+                        <div key={m.uid} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${cfg.color.split(' ').slice(0, 2).join(' ')}`}>
+                                    {(m.email || m.uid).charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="text-slate-200 text-sm font-medium truncate max-w-[140px]">
+                                        {m.email || m.uid.substring(0, 8)} {isYou ? '(You)' : ''}
+                                    </p>
+                                    <p className="text-slate-500 text-[10px] font-mono">{m.uid.substring(0, 8)}…</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
+                                {isOwner && (
+                                    <button
+                                        onClick={() => handleRemoveMember(m.uid)}
+                                        className="p-1.5 text-slate-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                        title="Remove member"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
                             </div>
                         </div>
-                    </div>
-                ))}
-                {project.pending_invites?.map((invEmail: string) => (
-                    <div key={invEmail} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-amber-500/10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">P</div>
-                            <div>
-                                <p className="text-slate-300 text-sm font-medium truncate max-w-[160px]">{invEmail}</p>
-                                <p className="text-amber-500/80 text-[10px]">Invite Pending</p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
+
+                {members.length === 0 && (
+                    <p className="text-slate-600 text-xs text-center py-4">No team members yet. Add one using their User Code.</p>
+                )}
             </div>
         </section>
     );
 };
-

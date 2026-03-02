@@ -84,9 +84,32 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
                             </p>
                         </div>
 
+                        {/* ─── User Code ─────────────────── */}
+                        <div className="inline-flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl px-5 py-3">
+                            <div className="space-y-0.5">
+                                <p className="text-indigo-400 text-[9px] font-black uppercase tracking-[0.2em]">Your User Code</p>
+                                <p className="text-indigo-200 font-black text-2xl tracking-widest font-mono">
+                                    {profile.user_code || `TM-${''}`}
+                                </p>
+                                <p className="text-slate-500 text-[9px]">Share this to be added to team projects</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (profile.user_code) {
+                                        navigator.clipboard.writeText(profile.user_code);
+                                    }
+                                }}
+                                className="p-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded-xl text-indigo-300 transition-all"
+                                title="Copy code"
+                            >
+                                <ExternalLink size={16} />
+                            </button>
+                        </div>
+
                         <p className="text-slate-400 text-sm leading-relaxed max-w-xl line-clamp-2 italic">
                             "{profile.bio || 'Your bio will appear here. Tell us about yourself...'}"
                         </p>
+
 
                         <div className="flex flex-wrap justify-center md:justify-start gap-3">
                             <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
@@ -524,10 +547,19 @@ export const Profile: React.FC = () => {
             const docRef = doc(db, `apps/${APP_ID}/users`, user!.uid);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-                setProfile(docSnap.data() as UserProfile);
+                const data = docSnap.data() as UserProfile;
+                // Backfill user_code for existing users who don't have one
+                if (!data.user_code) {
+                    const user_code = `TM-${user!.uid.substring(0, 6).toUpperCase()}`;
+                    await setDoc(docRef, { user_code }, { merge: true });
+                    data.user_code = user_code;
+                }
+                setProfile(data);
             } else {
+                const user_code = `TM-${user!.uid.substring(0, 6).toUpperCase()}`;
                 setProfile({
                     uid: user!.uid,
+                    user_code,
                     displayName: user!.displayName || '',
                     personalEmail: user!.email || '',
                     teamMembers: []

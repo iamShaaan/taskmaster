@@ -19,9 +19,12 @@ export const Auth: React.FC = () => {
         try {
             if (isLogin) {
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                // Sync profile on login
-                await setDoc(doc(db, `apps/${APP_ID}/users`, userCredential.user.uid), {
-                    uid: userCredential.user.uid,
+                const uid = userCredential.user.uid;
+                const user_code = `TM-${uid.substring(0, 6).toUpperCase()}`;
+                // Sync profile + ensure user_code on login
+                await setDoc(doc(db, `apps/${APP_ID}/users`, uid), {
+                    uid,
+                    user_code,
                     email: userCredential.user.email,
                     displayName: userCredential.user.displayName || 'User',
                     updated_at: serverTimestamp()
@@ -30,11 +33,19 @@ export const Auth: React.FC = () => {
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 await updateProfile(userCredential.user, { displayName: name });
-                // Create profile on signup
-                await setDoc(doc(db, `apps/${APP_ID}/users`, userCredential.user.uid), {
-                    uid: userCredential.user.uid,
+                const uid = userCredential.user.uid;
+                const user_code = `TM-${uid.substring(0, 6).toUpperCase()}`;
+                // Create profile on signup with user_code
+                await setDoc(doc(db, `apps/${APP_ID}/users`, uid), {
+                    uid,
+                    user_code,
                     email: userCredential.user.email,
                     displayName: name,
+                    members: [],
+                    member_uids: [],
+                    admin_uids: [],
+                    moderator_uids: [],
+                    viewer_uids: [],
                     created_at: serverTimestamp()
                 });
                 toast.success('Account created successfully!');

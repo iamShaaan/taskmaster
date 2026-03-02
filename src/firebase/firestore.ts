@@ -24,19 +24,32 @@ export const createDoc = async (path: string, data: Record<string, unknown>) => 
     const ref = await addDoc(col(path), {
         ...data,
         owner_id: user?.uid || null,
-        shared_with: data.shared_with || [],
+        // New member system (for projects)
+        members: data.members || [],
+        member_uids: data.member_uids || [],
+        admin_uids: data.admin_uids || [],
+        moderator_uids: data.moderator_uids || [],
+        viewer_uids: data.viewer_uids || [],
         created_at: serverTimestamp(),
-        // Ensure standard fields for global dashboard
         status: data.status || 'open',
         priority: data.priority || 'medium',
     });
     return ref.id;
 };
 
+// Search by old email field (kept for compatibility)
 export const searchUsers = async (email: string) => {
     const q = query(col('users'), where('email', '==', email));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+// Search by user code (new system) — e.g. "TM-A3X9P2"
+export const searchByUserCode = async (code: string) => {
+    const normalised = code.trim().toUpperCase();
+    const q = query(col('users'), where('user_code', '==', normalised));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 };
 
 export const updateDocById = async (path: string, id: string, data: Record<string, unknown>) => {

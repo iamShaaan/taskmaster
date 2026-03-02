@@ -3,47 +3,53 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ─── User Profiles ─────────────────────────────────────────────────────
-    // Any authenticated user can READ profiles (invite lookup, display names).
+    // Any authenticated user can READ profiles (user_code lookup, display names).
     // Only the profile owner can WRITE their own profile.
     match /apps/{appId}/users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ─── Invitations ───────────────────────────────────────────────────────
-    // Anyone can read an invite by token (needed before login to validate).
-    // Only authenticated users can create/update invites.
+    // ─── Invitations (legacy) ──────────────────────────────────────────────
+    // Kept for any existing invite tokens still in the DB.
     match /apps/{appId}/invitations/{token} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow create, update: if request.auth != null;
     }
 
-    // ─── Projects (special handling for shared_with) ───────────────────────
+    // ─── Projects (role-based) ─────────────────────────────────────────────
     match /apps/{appId}/projects/{docId} {
-      // Owner: full access
-      allow read, write: if request.auth != null
+      // Owner: full control
+      allow read, write, delete: if request.auth != null
         && resource != null
         && resource.data.owner_id == request.auth.uid;
 
-      // Shared members: read + create new sub-docs (notes etc.)
+      // Admin members: full control (same as owner)
+      allow read, write, delete: if request.auth != null
+        && resource != null
+        && resource.data.admin_uids is list
+        && request.auth.uid in resource.data.admin_uids;
+
+      // Moderator members: read + create + update (NO delete)
+      allow read, create, update: if request.auth != null
+        && resource != null
+        && resource.data.moderator_uids is list
+        && request.auth.uid in resource.data.moderator_uids;
+
+      // Viewer members: read only
       allow read: if request.auth != null
         && resource != null
-        && resource.data.shared_with is list
-        && request.auth.uid in resource.data.shared_with;
+        && resource.data.viewer_uids is list
+        && request.auth.uid in resource.data.viewer_uids;
 
-      // ✅ Invite self-acceptance:
-      // Allow a user to add ONLY themselves to shared_with if:
-      //   1. Their verified Firebase email is in pending_invites
-      //   2. The update only adds their UID to shared_with (no other changes to that field)
-      //   3. They are not already in shared_with
-      allow update: if request.auth != null
+      // Allow read via member_uids (catch-all for any member)
+      allow read: if request.auth != null
         && resource != null
-        && resource.data.pending_invites is list
-        && request.auth.token.email in resource.data.pending_invites
-        && request.resource.data.shared_with is list
-        && request.auth.uid in request.resource.data.shared_with
-        && !(request.auth.uid in resource.data.shared_with);
+        && resource.data.member_uids is list
+        && request.auth.uid in resource.data.member_uids;
+
+      // Create new project (no resource yet)
+      allow create: if request.auth != null && resource == null;
     }
 
     // ─── All other app data (tasks, clients, notes, meetings, actions…) ────
@@ -53,13 +59,11 @@ service cloud.firestore {
         && resource != null
         && resource.data.owner_id == request.auth.uid;
 
-      // Shared members: read only
-      allow read: if request.auth != null
-        && resource != null
-        && resource.data.shared_with is list
-        && request.auth.uid in resource.data.shared_with;
+      // Any project member can read tasks/meetings linked to shared projects
+      // (client-side filter handles further scoping)
+      allow read: if request.auth != null;
 
-      // New document creation (resource == null → no owner yet)
+      // Create new documents
       allow create: if request.auth != null && resource == null;
     }
 

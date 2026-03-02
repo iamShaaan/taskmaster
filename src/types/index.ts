@@ -1,3 +1,14 @@
+// ─── Team Member (role-based) ─────────────────────────────────────────────────
+export type MemberRole = 'admin' | 'moderator' | 'viewer';
+
+export interface ProjectMember {
+    uid: string;
+    email: string;     // label only — for display reference
+    role: MemberRole;
+    added_at: Date;
+}
+
+// ─── Core Entities ────────────────────────────────────────────────────────────
 export interface Task {
     id: string;
     title: string;
@@ -64,7 +75,14 @@ export interface Project {
     time_logs?: TimeLog[];
     total_time_ms?: number;
     owner_id: string;
-    shared_with: string[]; // Array of UIDs
+    // Role-based member system
+    members: ProjectMember[];       // full member objects (for display)
+    member_uids: string[];          // all non-owner UIDs (for array-contains listener)
+    admin_uids: string[];
+    moderator_uids: string[];
+    viewer_uids: string[];
+    // Legacy — kept for backwards compat
+    shared_with?: string[];
 }
 
 export interface Note {
@@ -82,6 +100,7 @@ export interface Note {
 
 export interface UserProfile {
     uid: string;
+    user_code: string;              // e.g. "TM-A3X9P2" — share to be added to projects
     displayName: string;
     fullName?: string;
     photoURL?: string;
