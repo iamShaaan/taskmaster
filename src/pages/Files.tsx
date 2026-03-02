@@ -1,7 +1,10 @@
-import React from 'react';
-import { HardDrive, Image, Video, FileText, Code, ExternalLink, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { HardDrive, Image, Video, FileText, Code, ExternalLink, Download, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { FileAttachment } from '../types';
+import { doc, updateDoc, arrayRemove } from 'firebase/firestore';
+import { db, APP_ID } from '../firebase/config';
+import toast from 'react-hot-toast';
 
 const getFileIcon = (type: string) => {
     if (type?.startsWith('image/')) return <Image size={16} className="text-indigo-400" />;
@@ -20,12 +23,48 @@ const formatBytes = (bytes: number) => {
 
 export const Files: React.FC = () => {
     const { tasks, clients, projects } = useAppStore();
+    const [deleting, setDeleting] = useState<string | null>(null);
 
-    const allFiles: (FileAttachment & { source: string })[] = [
-        ...tasks.flatMap((t) => (t.attachments || []).map((url) => ({ id: url, name: url.split('/').pop() || 'file', url, type: '', size: 0, uploaded_at: t.created_at, entity_type: 'task' as const, entity_id: t.id, source: `Task: ${t.title}` }))),
-        ...clients.flatMap((c) => (c.files || []).map((f) => ({ ...f, entity_type: 'client' as const, entity_id: c.id, source: `Client: ${c.name}` }))),
-        ...projects.flatMap((p) => (p.files || []).map((f) => ({ ...f, entity_type: 'project' as const, entity_id: p.id, source: `Project: ${p.name}` }))),
+    const allFiles: (FileAttachment & { source: string; entity_type: 'task' | 'client' | 'project'; entity_id: string })[] = [
+        ...tasks.flatMap((t) => (t.attachments || []).map((url) => ({
+            id: url, name: url.split('/').pop() || 'file', url, type: '', size: 0,
+            uploaded_at: t.created_at, entity_type: 'task' as const, entity_id: t.id, source: `Task: ${t.title}`
+        }))),
+        ...clients.flatMap((c) => (c.files || []).map((f) => ({
+            ...f, entity_type: 'client' as const, entity_id: c.id, source: `Client: ${c.name}`
+        }))),
+        ...projects.flatMap((p) => (p.files || []).map((f) => ({
+            ...f, entity_type: 'project' as const, entity_id: p.id, source: `Project: ${p.name}`
+        }))),
     ];
+
+    const handleDelete = async (file: typeof allFiles[0]) => {
+        if (!confirm(`Delete "${file.name}"? This cannot be undone.`)) return;
+        setDeleting(file.id);
+        try {
+            const collectionMap = { task: 'tasks', client: 'clients', project: 'projects' } as const;
+            const collectionName = collectionMap[file.entity_type];
+            const ref = doc(db, `apps/${APP_ID}/${collectionName}`, file.entity_id);
+
+            if (file.entity_type === 'task') {
+                // Tasks store attachments as URL array
+                await updateDoc(ref, { attachments: arrayRemove(file.url) });
+            } else {
+                // Clients/Projects store files as object array — remove by id
+                const currentFiles = file.entity_type === 'client'
+                    ? clients.find(c => c.id === file.entity_id)?.files || []
+                    : projects.find(p => p.id === file.entity_id)?.files || [];
+                const updated = currentFiles.filter((f: FileAttachment) => f.id !== file.id);
+                await updateDoc(ref, { files: updated });
+            }
+            toast.success(`Deleted ${file.name}`);
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to delete file');
+        } finally {
+            setDeleting(null);
+        }
+    };
 
     return (
         <div className="space-y-4">
@@ -49,7 +88,7 @@ export const Files: React.FC = () => {
                         </thead>
                         <tbody>
                             {allFiles.map((file, i) => (
-                                <tr key={`${file.id}-${i}`} className="border-b border-slate-700/30 last:border-0 hover:bg-slate-700/30 transition-colors">
+                                <tr key={`${file.id}-${i}`} className={`border-b border-slate-700/30 last:border-0 transition-colors ${deleting === file.id ? 'opacity-40' : 'hover:bg-slate-700/30'}`}>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
                                             {getFileIcon(file.type)}
@@ -71,6 +110,14 @@ export const Files: React.FC = () => {
                                             <a href={file.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
                                                 <ExternalLink size={14} />
                                             </a>
+                                            <button
+                                                onClick={() => handleDelete(file)}
+                                                disabled={deleting === file.id}
+                                                title="Delete file"
+                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-30"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>

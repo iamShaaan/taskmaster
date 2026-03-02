@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -16,6 +16,8 @@ import {
     User
 } from 'lucide-react';
 import { useAppStore } from '../../store';
+import { db, APP_ID } from '../../firebase/config';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -32,6 +34,19 @@ export const Sidebar: React.FC = () => {
     const { sidebarOpen, setSidebarOpen, activeTimerId, tasks } = useAppStore();
     const { user, logout } = useAuth();
     const activeTask = tasks.find((t) => t.id === activeTimerId);
+    const [photoURL, setPhotoURL] = useState<string | null>(null);
+
+    // Live-listen to the user's profile photo from Firestore
+    useEffect(() => {
+        if (!user?.uid) return;
+        const unsub = onSnapshot(doc(db, `apps/${APP_ID}/users`, user.uid), (snap) => {
+            const data = snap.data();
+            setPhotoURL(data?.photoURL || null);
+        });
+        return unsub;
+    }, [user?.uid]);
+
+    const initials = user?.displayName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || '?';
 
     return (
         <aside
@@ -101,8 +116,19 @@ export const Sidebar: React.FC = () => {
             <div className="mt-auto border-t border-slate-700/50 p-4 space-y-4">
                 {user && (
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-bold shadow-inner transition-all duration-200 hover:border-indigo-500/40 hover:shadow-[0_0_10px_rgba(99,102,241,0.15)]">
-                            {user.displayName?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                        {/* Avatar: profile photo or initial */}
+                        <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 border border-slate-700 shadow-inner transition-all duration-200 hover:border-indigo-500/40 hover:shadow-[0_0_10px_rgba(99,102,241,0.15)]">
+                            {photoURL ? (
+                                <img
+                                    src={photoURL}
+                                    alt="avatar"
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-slate-800 flex items-center justify-center text-indigo-400 font-bold text-sm">
+                                    {initials}
+                                </div>
+                            )}
                         </div>
                         {sidebarOpen && (
                             <div className="flex-1 min-w-0">
