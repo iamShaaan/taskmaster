@@ -43,15 +43,24 @@ export const Tasks: React.FC = () => {
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
         const newStatus = destination.droppableId as Task['status'];
+        const task = tasks.find(t => t.id === draggableId);
 
         try {
+            // Claim orphan task first so the subsequent write is permitted by Firestore rules
+            if (task && !task.owner_id) {
+                const { auth } = await import('../firebase/config');
+                if (auth.currentUser) {
+                    await updateDocById('tasks', draggableId, { owner_id: auth.currentUser.uid });
+                }
+            }
             await updateDocById('tasks', draggableId, { status: newStatus });
-            toast.success(`Task moved to ${newStatus}`);
+            toast.success(`Moved to ${newStatus.replace('_', ' ')}`);
         } catch (error) {
-            toast.error('Failed to move task');
+            toast.error('Failed to move task — check your permissions.');
             console.error(error);
         }
     };
+
 
     return (
         <div className="h-full flex flex-col gap-6">

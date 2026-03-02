@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tag, Calendar, Play, Square, Timer, Pencil, Trash2 } from 'lucide-react';
+import { Tag, Calendar, Play, Square, Timer, Pencil, Trash2, Loader2 } from 'lucide-react';
 import type { Task } from '../../types';
 import { statusBadge, priorityBadge, typeBadge } from '../ui/Badge';
 import { formatDuration, formatDate, isOverdue } from '../../utils/timeFormat';
 import { useTimer } from '../../hooks/useTimer';
-import { deleteDocById } from '../../firebase/firestore';
+import { deleteDocById, updateDocById } from '../../firebase/firestore';
+import { auth } from '../../firebase/config';
 import toast from 'react-hot-toast';
 
 interface TaskCardProps {
@@ -17,14 +18,23 @@ interface TaskCardProps {
 export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = false }) => {
     const { isRunning, elapsed, start, stop } = useTimer(task.id, task.time_logs || []);
     const overdue = task.due_date ? isOverdue(task.due_date) && task.status !== 'done' : false;
+    const [deleting, setDeleting] = useState(false);
 
     const handleDelete = async () => {
-        if (!confirm('Delete this task?')) return;
+        if (!confirm('Delete this task? You can restore it from Archive within 30 days.')) return;
+        setDeleting(true);
         try {
+            // If task has no owner or wrong owner, claim it first so soft-delete updateDoc succeeds
+            if (!task.owner_id && auth.currentUser) {
+                await updateDocById('tasks', task.id, { owner_id: auth.currentUser.uid });
+            }
             await deleteDocById('tasks', task.id);
-            toast.success('Task deleted');
-        } catch {
-            toast.error('Failed to delete task');
+            toast.success('Task moved to Archive');
+        } catch (err) {
+            console.error('Delete task error:', err);
+            toast.error('Failed to delete task. Check your connection and try again.');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -56,8 +66,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                     <button onClick={() => onEdit(task)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
                         <Pencil size={14} />
                     </button>
-                    <button onClick={handleDelete} className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all">
-                        <Trash2 size={14} />
+                    <button onClick={handleDelete} disabled={deleting} className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40">
+                        {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                     </button>
                 </div>
             </div>
