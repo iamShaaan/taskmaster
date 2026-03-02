@@ -9,8 +9,9 @@ import { Clients } from './pages/Clients';
 import { Projects } from './pages/Projects';
 import { Notes } from './pages/Notes';
 import { Files } from './pages/Files';
+import { Auth } from './pages/Auth';
 import { useAuth } from './hooks/useAuth';
-import { listenCollection, orderBy, toDate } from './firebase/firestore';
+import { listenCollection, orderBy, toDate, where } from './firebase/firestore';
 import { useAppStore } from './store';
 import type { Task, Meeting, Client, Project, Note } from './types';
 import { Sparkles } from 'lucide-react';
@@ -20,10 +21,13 @@ import { ProjectDetail } from './pages/ProjectDetail';
 
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
+  const { user } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
     const unsubs: (() => void)[] = [];
 
+    // Personal items: Filter by owner_id
     unsubs.push(listenCollection('tasks', (data) => {
       setTasks(data.map((d) => ({
         ...d,
@@ -35,7 +39,7 @@ const DataLoader: React.FC = () => {
           duration_ms: l.duration_ms as number,
         })),
       } as unknown as Task)));
-    }, orderBy('created_at', 'desc')));
+    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
 
     unsubs.push(listenCollection('meetings', (data) => {
       setMeetings(data.map((d) => ({
@@ -44,8 +48,17 @@ const DataLoader: React.FC = () => {
         end_time: toDate(d.end_time as never) || new Date(),
         created_at: toDate(d.created_at as never) || new Date(),
       } as unknown as Meeting)));
-    }, orderBy('start_time', 'asc')));
+    }, where('owner_id', '==', user.uid), orderBy('start_time', 'asc')));
 
+    unsubs.push(listenCollection('notes', (data) => {
+      setNotes(data.map((d) => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date(),
+        updated_at: toDate(d.updated_at as never) || new Date(),
+      } as unknown as Note)));
+    }, where('owner_id', '==', user.uid), orderBy('updated_at', 'desc')));
+
+    // Shared items: All users of the app can see clients and projects
     unsubs.push(listenCollection('clients', (data) => {
       setClients(data.map((d) => ({ ...d, created_at: toDate(d.created_at as never) || new Date() } as unknown as Client)));
     }));
@@ -62,16 +75,8 @@ const DataLoader: React.FC = () => {
       } as unknown as Project)));
     }));
 
-    unsubs.push(listenCollection('notes', (data) => {
-      setNotes(data.map((d) => ({
-        ...d,
-        created_at: toDate(d.created_at as never) || new Date(),
-        updated_at: toDate(d.updated_at as never) || new Date(),
-      } as unknown as Note)));
-    }, orderBy('updated_at', 'desc')));
-
     return () => unsubs.forEach((u) => u());
-  }, [setTasks, setMeetings, setClients, setProjects, setNotes]);
+  }, [user, setTasks, setMeetings, setClients, setProjects, setNotes]);
 
   return null;
 };
@@ -88,13 +93,13 @@ const LoadingScreen: React.FC = () => (
 );
 
 function App() {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) return <LoadingScreen />;
 
   return (
     <BrowserRouter>
-      <DataLoader />
+      {user && <DataLoader />}
       <Toaster
         position="top-right"
         toastOptions={{
@@ -104,17 +109,21 @@ function App() {
         }}
       />
       <Routes>
-        <Route path="/" element={<AppShell />}>
-          <Route index element={<Dashboard />} />
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="meetings" element={<Meetings />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="clients/:id" element={<ClientDetail />} />
-          <Route path="projects" element={<Projects />} />
-          <Route path="projects/:id" element={<ProjectDetail />} />
-          <Route path="notes" element={<Notes />} />
-          <Route path="files" element={<Files />} />
-        </Route>
+        {!user ? (
+          <Route path="*" element={<Auth />} />
+        ) : (
+          <Route path="/" element={<AppShell />}>
+            <Route index element={<Dashboard />} />
+            <Route path="tasks" element={<Tasks />} />
+            <Route path="meetings" element={<Meetings />} />
+            <Route path="clients" element={<Clients />} />
+            <Route path="clients/:id" element={<ClientDetail />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="projects/:id" element={<ProjectDetail />} />
+            <Route path="notes" element={<Notes />} />
+            <Route path="files" element={<Files />} />
+          </Route>
+        )}
       </Routes>
     </BrowserRouter>
   );

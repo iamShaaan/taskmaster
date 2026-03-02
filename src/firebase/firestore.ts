@@ -14,13 +14,18 @@ import {
     onSnapshot,
     QueryConstraint,
 } from 'firebase/firestore';
-import { db, APP_ID } from './config';
+import { db, APP_ID, auth } from './config';
 
 export const col = (path: string) => collection(db, `apps/${APP_ID}/${path}`);
 export const docRef = (path: string, id: string) => doc(db, `apps/${APP_ID}/${path}`, id);
 
 export const createDoc = async (path: string, data: Record<string, unknown>) => {
-    const ref = await addDoc(col(path), { ...data, created_at: serverTimestamp() });
+    const user = auth.currentUser;
+    const ref = await addDoc(col(path), {
+        ...data,
+        owner_id: user?.uid || null,
+        created_at: serverTimestamp()
+    });
     return ref.id;
 };
 
