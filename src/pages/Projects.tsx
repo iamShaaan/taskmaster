@@ -7,6 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import type { Project } from '../types';
 import { deleteDocById } from '../firebase/firestore';
 import { statusBadge } from '../components/ui/Badge';
+import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
 
 export const Projects: React.FC = () => {
@@ -42,6 +43,7 @@ export const Projects: React.FC = () => {
                         const doneTasks = projectTasks.filter((t) => t.status === 'done').length;
                         const projectMeetings = meetings.filter((m) => m.linked_project_id === project.id);
                         const progress = projectTasks.length > 0 ? Math.round((doneTasks / projectTasks.length) * 100) : 0;
+                        const isOwner = auth.currentUser?.uid === project.owner_id;
 
                         return (
                             <div key={project.id} className="group bg-slate-800 border border-slate-700/50 rounded-xl p-5 hover:border-indigo-500/40 transition-all">
@@ -63,12 +65,16 @@ export const Projects: React.FC = () => {
                                         >
                                             <ExternalLink size={14} />
                                         </button>
-                                        <button onClick={() => { setEditProject(project); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all">
-                                            <Pencil size={13} />
-                                        </button>
-                                        <button onClick={() => handleDelete(project.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all">
-                                            <Trash2 size={13} />
-                                        </button>
+                                        {isOwner && (
+                                            <>
+                                                <button onClick={() => { setEditProject(project); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all">
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button onClick={() => handleDelete(project.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all">
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 

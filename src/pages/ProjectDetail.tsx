@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FolderKanban, CheckSquare, Calendar,
-    FileArchive, Play, Square, Timer, Upload, ExternalLink, Users
+    FileArchive, Play, Square, Timer, Upload, ExternalLink, Users, Download, Trash2
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
@@ -11,7 +11,7 @@ import { formatDate, formatDuration } from '../utils/timeFormat';
 import { useTimer } from '../hooks/useTimer';
 import { useDropzone } from 'react-dropzone';
 import { auth } from '../firebase/config';
-import { uploadFile } from '../firebase/storage';
+import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -23,6 +23,7 @@ export const ProjectDetail: React.FC = () => {
 
     const project = projects.find((p) => p.id === id);
     const client = clients.find((c) => c.id === project?.client_id);
+    const isOwner = auth.currentUser?.uid === project?.owner_id;
 
     const { isRunning, elapsed, start, stop } = useTimer(
         project?.id || '',
@@ -59,6 +60,21 @@ export const ProjectDetail: React.FC = () => {
             console.error(error);
         } finally {
             setUploading(false);
+        }
+    }, [project]);
+
+    const handleDeleteFile = useCallback(async (fileId: string, fileUrl: string) => {
+        if (!project) return;
+        if (!window.confirm('Delete this file? This cannot be undone.')) return;
+        try {
+            const storageRef = fileUrl;
+            await deleteFile(storageRef);
+            const updatedFiles = (project.files || []).filter(f => f.id !== fileId);
+            await updateDocById('projects', project.id, { files: updatedFiles });
+            toast.success('File deleted');
+        } catch (error) {
+            toast.error('Failed to delete file');
+            console.error(error);
         }
     }, [project]);
 
@@ -121,16 +137,18 @@ export const ProjectDetail: React.FC = () => {
                             </span>
                         </div>
                     </div>
-                    <button
-                        onClick={isRunning ? stop : start}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95 ${isRunning
-                            ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
-                            : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-500/20'
-                            }`}
-                    >
-                        {isRunning ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                        {isRunning ? 'STOP' : 'START'}
-                    </button>
+                    {isOwner && (
+                        <button
+                            onClick={isRunning ? stop : start}
+                            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95 ${isRunning
+                                ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
+                                : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-500/20'
+                                }`}
+                        >
+                            {isRunning ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                            {isRunning ? 'STOP' : 'START'}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -167,29 +185,54 @@ export const ProjectDetail: React.FC = () => {
                             <span className="text-xs font-normal text-slate-500">{project.files?.length || 0} items</span>
                         </h2>
 
-                        {/* Dropzone */}
-                        <div
-                            {...getRootProps()}
-                            className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all mb-4 ${isDragActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-slate-500'
-                                }`}
-                        >
-                            <input {...getInputProps()} />
-                            <Upload size={24} className="mx-auto mb-2 text-slate-500" />
-                            <p className="text-xs text-slate-400">
-                                {uploading ? 'Uploading...' : 'Drop files here or click to upload'}
-                            </p>
-                        </div>
+                        {/* Dropzone — owner only */}
+                        {isOwner && (
+                            <div
+                                {...getRootProps()}
+                                className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all mb-4 ${isDragActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-slate-500'
+                                    }`}
+                            >
+                                <input {...getInputProps()} />
+                                <Upload size={24} className="mx-auto mb-2 text-slate-500" />
+                                <p className="text-xs text-slate-400">
+                                    {uploading ? 'Uploading...' : 'Drop files here or click to upload'}
+                                </p>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             {project.files?.map(f => (
                                 <div key={f.id} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl group border border-transparent hover:border-indigo-500/20 transition-all">
-                                    <div className="flex items-center gap-3">
-                                        <FileArchive size={16} className="text-indigo-400" />
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <FileArchive size={16} className="text-indigo-400 flex-shrink-0" />
                                         <span className="text-slate-300 text-xs truncate max-w-[120px]">{f.name}</span>
                                     </div>
-                                    <a href={f.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
-                                        <ExternalLink size={14} />
-                                    </a>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        {/* Download — visible to all */}
+                                        <a
+                                            href={f.url}
+                                            download={f.name}
+                                            title="Download file"
+                                            className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
+                                            onClick={e => e.stopPropagation()}
+                                        >
+                                            <Download size={14} />
+                                        </a>
+                                        {/* External link */}
+                                        <a href={f.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
+                                            <ExternalLink size={14} />
+                                        </a>
+                                        {/* Delete — owner only */}
+                                        {isOwner && (
+                                            <button
+                                                onClick={() => handleDeleteFile(f.id, f.url)}
+                                                title="Delete file"
+                                                className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                             {(!project.files || project.files.length === 0) && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { HardDrive, Image, Video, FileText, Code, ExternalLink } from 'lucide-react';
+import { HardDrive, Image, Video, FileText, Code, ExternalLink, Download } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { FileAttachment } from '../types';
 
@@ -44,7 +44,7 @@ export const Files: React.FC = () => {
                                 <th className="text-slate-500 text-xs font-medium text-left px-4 py-3">File</th>
                                 <th className="text-slate-500 text-xs font-medium text-left px-4 py-3">Source</th>
                                 <th className="text-slate-500 text-xs font-medium text-left px-4 py-3">Size</th>
-                                <th className="text-slate-500 text-xs font-medium text-left px-4 py-3"></th>
+                                <th className="text-slate-500 text-xs font-medium text-left px-4 py-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -59,9 +59,19 @@ export const Files: React.FC = () => {
                                     <td className="px-4 py-3 text-slate-500 text-xs">{file.source}</td>
                                     <td className="px-4 py-3 text-slate-500 text-xs">{formatBytes(file.size)}</td>
                                     <td className="px-4 py-3">
-                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors block">
-                                            <ExternalLink size={14} />
-                                        </a>
+                                        <div className="flex items-center gap-1">
+                                            <a
+                                                href={file.url}
+                                                download={file.name}
+                                                title="Download"
+                                                className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
+                                            >
+                                                <Download size={14} />
+                                            </a>
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
+                                                <ExternalLink size={14} />
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
