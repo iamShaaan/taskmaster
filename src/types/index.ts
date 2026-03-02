@@ -48,7 +48,9 @@ export interface Meeting {
     reminder_sent: boolean;
     created_at: Date;
     location?: string;
+    outcome?: 'ended' | 'success' | 'failed'; // status set after meeting ends
 }
+
 
 export interface Client {
     id: string;
