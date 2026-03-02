@@ -1,8 +1,7 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Bell, Search } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 
 const PAGE_TITLES: Record<string, string> = {
     '/': 'Dashboard',
@@ -12,6 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/projects': 'Projects',
     '/notes': 'Notes & Vault',
     '/files': 'Files',
+    '/profile': 'My Profile',
 };
 
 export const AppShell: React.FC = () => {
@@ -25,7 +25,7 @@ export const AppShell: React.FC = () => {
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Topbar */}
                 <header className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
-                    <div>
+                    <div key={location.pathname} className="page-title-fade">
                         <h1 className="text-slate-100 text-xl font-bold">{title}</h1>
                         <p className="text-slate-500 text-xs">{today}</p>
                     </div>
@@ -35,18 +35,20 @@ export const AppShell: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Search..."
-                                className="bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 w-48 focus:outline-none focus:border-indigo-500 transition-colors"
+                                className="bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 w-48 focus:outline-none focus:border-indigo-500/70 focus:ring-2 focus:ring-indigo-500/10 focus:w-64 transition-all duration-300"
                             />
                         </div>
-                        <button className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-all relative">
+                        <button className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 hover:shadow-[0_0_12px_rgba(99,102,241,0.15)] transition-all duration-200 relative">
                             <Bell size={18} />
                         </button>
                     </div>
                 </header>
 
-                {/* Main Content */}
+                {/* Main Content — keyed on location.key so each route change re-mounts the animation */}
                 <main className="flex-1 overflow-y-auto p-6">
-                    <Outlet />
+                    <div key={location.key} className="page-enter h-full">
+                        <Outlet />
+                    </div>
                 </main>
             </div>
         </div>

@@ -35,34 +35,53 @@ export const Sidebar: React.FC = () => {
 
     return (
         <aside
-            className={`${sidebarOpen ? 'w-64' : 'w-18'} transition-all duration-300 bg-slate-900 border-r border-slate-700/50 flex flex-col h-screen sticky top-0 z-30`}
+            className={`${sidebarOpen ? 'w-64' : 'w-18'} transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] bg-slate-900 border-r border-slate-700/50 flex flex-col h-screen sticky top-0 z-30`}
         >
             {/* Logo */}
             <div className="flex items-center gap-3 px-4 py-6 border-b border-slate-700/50 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20 transition-transform duration-200 hover:scale-105">
                     <Sparkles size={18} className="text-white" />
                 </div>
                 {sidebarOpen && (
-                    <span className="text-slate-100 font-bold text-lg tracking-tight">TaskMaster</span>
+                    <span className="text-slate-100 font-bold text-lg tracking-tight transition-opacity duration-200">TaskMaster</span>
                 )}
             </div>
 
             {/* Nav Items */}
-            <nav className="flex-1 space-y-1.5 px-3">
+            <nav className="flex-1 space-y-1 px-3">
                 {navItems.map(({ to, icon: Icon, label, end }) => (
                     <NavLink
                         key={to}
                         to={to}
                         end={end}
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
-                                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                            `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden ${isActive
+                                ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/25 shadow-[0_0_20px_rgba(99,102,241,0.12)]'
+                                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 hover:shadow-[0_0_10px_rgba(99,102,241,0.06)] border border-transparent'
                             }`
                         }
                     >
-                        <Icon size={20} className="flex-shrink-0" />
-                        {sidebarOpen && <span className="text-sm font-semibold tracking-wide">{label}</span>}
+                        {({ isActive }) => (
+                            <>
+                                {/* Active left accent bar */}
+                                <span
+                                    className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-r-full transition-all duration-300 ${isActive
+                                        ? 'h-5 bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]'
+                                        : 'h-0 bg-transparent'
+                                        }`}
+                                />
+                                <Icon
+                                    size={19}
+                                    className={`flex-shrink-0 transition-all duration-200 ${isActive
+                                        ? 'text-indigo-400'
+                                        : 'group-hover:scale-110 group-hover:text-slate-100'
+                                        }`}
+                                />
+                                {sidebarOpen && (
+                                    <span className="text-sm font-semibold tracking-wide truncate">{label}</span>
+                                )}
+                            </>
+                        )}
                     </NavLink>
                 ))}
             </nav>
@@ -82,7 +101,7 @@ export const Sidebar: React.FC = () => {
             <div className="mt-auto border-t border-slate-700/50 p-4 space-y-4">
                 {user && (
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-bold shadow-inner">
+                        <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-bold shadow-inner transition-all duration-200 hover:border-indigo-500/40 hover:shadow-[0_0_10px_rgba(99,102,241,0.15)]">
                             {user.displayName?.charAt(0) || user.email?.charAt(0).toUpperCase()}
                         </div>
                         {sidebarOpen && (
@@ -97,14 +116,14 @@ export const Sidebar: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="flex-1 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-all flex items-center justify-center"
+                        className="flex-1 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-slate-100 hover:bg-slate-700 hover:border-slate-600 transition-all duration-200 flex items-center justify-center"
                     >
                         {sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                     </button>
                     {sidebarOpen && (
                         <button
                             onClick={logout}
-                            className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200"
+                            className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] transition-all duration-200"
                             title="Logout"
                         >
                             <LogOut size={16} />
