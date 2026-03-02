@@ -56,9 +56,30 @@ export const updateDocById = async (path: string, id: string, data: Record<strin
     await updateDoc(docRef(path, id), { ...data, updated_at: serverTimestamp() });
 };
 
+// Soft-delete: stamps deleted_at instead of removing the document.
+// Items are filtered from live listeners and can be restored within 30 days.
 export const deleteDocById = async (path: string, id: string) => {
+    await updateDoc(docRef(path, id), {
+        deleted_at: serverTimestamp(),
+        deleted_from: path,
+        updated_at: serverTimestamp(),
+    });
+};
+
+// Restore: clears the deleted_at stamp
+export const restoreDocById = async (path: string, id: string) => {
+    await updateDoc(docRef(path, id), {
+        deleted_at: null,
+        deleted_from: null,
+        updated_at: serverTimestamp(),
+    });
+};
+
+// Hard-delete: permanent removal (use for purge-after-30-days flow)
+export const purgeDocById = async (path: string, id: string) => {
     await deleteDoc(docRef(path, id));
 };
+
 
 export const getDocById = async (path: string, id: string) => {
     const snap = await getDoc(docRef(path, id));

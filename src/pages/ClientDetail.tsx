@@ -69,7 +69,41 @@ export const ClientDetail: React.FC = () => {
                 </div>
             </div>
 
-            {/* Grid Layout */}
+            {/* Contact Info Card */}
+            {((client.phones?.length ?? 0) > 0 || (client.emails?.length ?? 0) > 0) && (
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5">
+                    <h2 className="text-slate-300 text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Phone size={13} className="text-emerald-400" /> Contact Information
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {client.phones?.map(p => (
+                            <a key={p} href={`tel:${p}`}
+                                className="flex items-center gap-3 p-3 bg-slate-900/60 border border-slate-700/40 rounded-xl hover:border-emerald-500/40 hover:bg-emerald-500/5 group transition-all">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500/20 transition-all">
+                                    <Phone size={14} className="text-emerald-400" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Phone</p>
+                                    <p className="text-slate-200 text-sm font-medium group-hover:text-emerald-300 transition-colors">{p}</p>
+                                </div>
+                            </a>
+                        ))}
+                        {client.emails?.map(e => (
+                            <a key={e} href={`mailto:${e}`}
+                                className="flex items-center gap-3 p-3 bg-slate-900/60 border border-slate-700/40 rounded-xl hover:border-indigo-500/40 hover:bg-indigo-500/5 group transition-all">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-500/20 transition-all">
+                                    <Mail size={14} className="text-indigo-400" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Email</p>
+                                    <p className="text-slate-200 text-sm font-medium group-hover:text-indigo-300 transition-colors">{e}</p>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                 {/* Left Column: Projects & Notes */}

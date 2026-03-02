@@ -19,6 +19,7 @@ import { Sparkles } from 'lucide-react';
 import { ClientDetail } from './pages/ClientDetail';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Profile } from './pages/Profile';
+import { ArchivePage } from './pages/ArchivePage';
 
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -30,7 +31,7 @@ const DataLoader: React.FC = () => {
 
     // Personal items: Filter by owner_id
     unsubs.push(listenCollection('tasks', (data) => {
-      setTasks(data.map((d) => ({
+      setTasks(data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         due_date: toDate(d.due_date as never),
         created_at: toDate(d.created_at as never) || new Date(),
@@ -43,7 +44,7 @@ const DataLoader: React.FC = () => {
     }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
 
     unsubs.push(listenCollection('meetings', (data) => {
-      setMeetings(data.map((d) => ({
+      setMeetings(data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         start_time: toDate(d.start_time as never) || new Date(),
         end_time: toDate(d.end_time as never) || new Date(),
@@ -52,7 +53,7 @@ const DataLoader: React.FC = () => {
     }, where('owner_id', '==', user.uid), orderBy('start_time', 'asc')));
 
     unsubs.push(listenCollection('notes', (data) => {
-      setNotes(data.map((d) => ({
+      setNotes(data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date(),
         updated_at: toDate(d.updated_at as never) || new Date(),
@@ -61,7 +62,7 @@ const DataLoader: React.FC = () => {
 
     // Clients are now private by default
     unsubs.push(listenCollection('clients', (data) => {
-      setClients(data.map((d) => ({ ...d, created_at: toDate(d.created_at as never) || new Date() } as unknown as Client)));
+      setClients(data.filter(d => !d.deleted_at).map((d) => ({ ...d, created_at: toDate(d.created_at as never) || new Date() } as unknown as Client)));
     }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
 
     // Projects: Visible if owner OR if user is in shared_with array
@@ -69,8 +70,9 @@ const DataLoader: React.FC = () => {
     // However, we can use a simpler approach: fetch where owner OR fetch where shared_with (though onSnapshot is per-query).
     // Alternative: Just fetch everything and filter in-memory if team size is small, OR do two separate listeners.
     // For now, let's use the 'shared_with' if we can, or just implement the ownership for now and then add sharing.
+    // First listener: projects owned by user
     unsubs.push(listenCollection('projects', (data) => {
-      setProjects(data.map((d) => ({
+      setProjects(data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date(),
         time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
@@ -83,7 +85,7 @@ const DataLoader: React.FC = () => {
 
     // Second listener: projects shared with this user (member_uids array-contains)
     unsubs.push(listenCollection('projects', (data) => {
-      const sharedProjects = data.map((d) => ({
+      const sharedProjects = data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date(),
         time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
@@ -144,6 +146,7 @@ function App() {
             <Route path="notes" element={<Notes />} />
             <Route path="files" element={<Files />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="archive" element={<ArchivePage />} />
           </Route>
         )}
       </Routes>

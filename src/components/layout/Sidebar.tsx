@@ -13,7 +13,8 @@ import {
     ChevronRight,
     Sparkles,
     LogOut,
-    User
+    User,
+    Archive
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { db, APP_ID } from '../../firebase/config';
@@ -27,6 +28,7 @@ const navItems = [
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/notes', icon: FileText, label: 'Notes & Vault' },
     { to: '/files', icon: HardDrive, label: 'Files' },
+    { to: '/archive', icon: Archive, label: 'Archive' },
     { to: '/profile', icon: User, label: 'My Profile' },
 ];
 
