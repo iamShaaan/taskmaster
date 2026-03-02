@@ -15,6 +15,7 @@ export interface Task {
     total_time_ms: number;
     tags: string[];
     owner_id: string;
+    completed_at?: Date;
 }
 
 export interface TimeLog {
@@ -72,8 +73,29 @@ export interface Note {
     content: string;
     tags: string[];
     is_secure: boolean;
+    is_credential?: boolean;
+    template_type?: 'api_key' | 'credentials' | 'none';
     created_at: Date;
     updated_at: Date;
+    owner_id?: string;
+}
+
+export interface UserProfile {
+    uid: string;
+    displayName: string;
+    fullName?: string;
+    photoURL?: string;
+    personalEmail?: string;
+    professionalEmail?: string;
+    phoneNumbers?: string[];
+    websites?: string[];
+    signatureURL?: string;
+    bio?: string;
+    companyName?: string;
+    companyDescription?: string;
+    teamMembers?: { email: string; phone?: string; }[];
+    productivityScore?: number;
+    lastCalculated?: Date;
 }
 
 export interface FileAttachment {

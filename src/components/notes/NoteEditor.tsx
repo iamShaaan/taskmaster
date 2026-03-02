@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Note } from '../../types';
 import { createDoc, updateDocById } from '../../firebase/firestore';
 import toast from 'react-hot-toast';
-import { Lock, Unlock, EyeOff } from 'lucide-react';
+import { Lock, Unlock, Zap } from 'lucide-react';
 
 interface NoteEditorProps {
     onClose: () => void;
@@ -20,6 +20,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote }) => 
         content: editNote?.content || '',
         tags: editNote?.tags || [] as string[],
         is_secure: editNote?.is_secure || false,
+        is_credential: editNote?.is_credential || false,
     });
 
     const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
@@ -63,21 +64,39 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote }) => 
                         type="button"
                         onClick={() => set('is_secure', !form.is_secure)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${form.is_secure
-                                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                                : 'bg-slate-700 text-slate-400 border-slate-600 hover:border-slate-500'
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : 'bg-slate-700 text-slate-400 border-slate-600 hover:border-slate-500'
                             }`}
                         title="Toggle secure/vault mode"
                     >
                         {form.is_secure ? <Lock size={14} /> : <Unlock size={14} />}
                         {form.is_secure ? 'Vault' : 'Normal'}
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            set('is_credential', !form.is_credential);
+                            if (!form.is_credential) {
+                                set('content', `SERVICE: \nAPI KEY: \nURL: \nNOTES: \n${form.content}`);
+                            }
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${form.is_credential
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : 'bg-slate-700 text-slate-400 border-slate-600 hover:border-slate-500'
+                            }`}
+                    >
+                        <Zap size={14} />
+                        {form.is_credential ? 'Credential' : 'Standard'}
+                    </button>
                 </div>
             </div>
 
-            {form.is_secure && (
-                <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                    <EyeOff size={15} className="text-amber-400" />
-                    <p className="text-amber-300 text-xs">This note is marked as secure. It will be hidden behind a lock on the notes page.</p>
+            {(form.is_secure || form.is_credential) && (
+                <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                    <Zap size={15} className="text-indigo-400" />
+                    <p className="text-indigo-300 text-[10px] font-medium leading-relaxed">
+                        {form.is_credential ? "Credential mode enabled. Template injected for secure storage." : "Vault mode enabled. This note will be hidden behind your PIN."}
+                    </p>
                 </div>
             )}
 

@@ -13,6 +13,7 @@ import {
     ChevronRight,
     Sparkles,
     LogOut,
+    User
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 
@@ -24,6 +25,7 @@ const navItems = [
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/notes', icon: FileText, label: 'Notes & Vault' },
     { to: '/files', icon: HardDrive, label: 'Files' },
+    { to: '/profile', icon: User, label: 'My Profile' },
 ];
 
 export const Sidebar: React.FC = () => {

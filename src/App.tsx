@@ -18,6 +18,7 @@ import { Sparkles } from 'lucide-react';
 
 import { ClientDetail } from './pages/ClientDetail';
 import { ProjectDetail } from './pages/ProjectDetail';
+import { Profile } from './pages/Profile';
 
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -144,6 +145,7 @@ function App() {
             <Route path="projects/:id" element={<ProjectDetail />} />
             <Route path="notes" element={<Notes />} />
             <Route path="files" element={<Files />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
         )}
       </Routes>
