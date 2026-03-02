@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Lock, Unlock, Eye, EyeOff, Pencil, Trash2, Tag, Search, Shield, KeyRound, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Lock, Unlock, Eye, EyeOff, Pencil, Trash2, Tag, Search, Shield, KeyRound, AlertTriangle, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../store';
 import { NoteEditor } from '../components/notes/NoteEditor';
 import { Modal } from '../components/ui/Modal';
@@ -19,140 +19,195 @@ const hashPin = async (pin: string): Promise<string> => {
     return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// ─── Vault Lock Screen ────────────────────────────────────────────────────────
-const VaultLockScreen: React.FC<{
-    hasPin: boolean;
-    onUnlock: (pin: string) => void;
-    onSetPin: (pin: string) => void;
-}> = ({ hasPin, onUnlock, onSetPin }) => {
-    const [pin, setPin] = useState('');
-    const [confirmPin, setConfirmPin] = useState('');
-    const [step, setStep] = useState<'enter' | 'set' | 'confirm'>(hasPin ? 'enter' : 'set');
-    const [loading, setLoading] = useState(false);
-
-    const handleEnter = async () => {
-        if (pin.length < 4) { toast.error('PIN must be at least 4 digits'); return; }
-        setLoading(true);
-        await new Promise(r => setTimeout(r, 300)); // Small delay for perception
-        onUnlock(pin);
-        setLoading(false);
-        setPin('');
-    };
-
-    const handleSetPin = async () => {
-        if (pin.length < 4) { toast.error('PIN must be at least 4 digits'); return; }
-        setStep('confirm');
-    };
-
-    const handleConfirm = async () => {
-        if (pin !== confirmPin) { toast.error('PINs do not match'); setConfirmPin(''); return; }
-        setLoading(true);
-        await onSetPin(pin);
-        setLoading(false);
-        setPin('');
-        setConfirmPin('');
-    };
-
-    const digits = (val: string, setter: (v: string) => void) => (
-        <div className="flex gap-2 justify-center">
-            {[0, 1, 2, 3, 4, 5].map(i => (
-                <div
-                    key={i}
-                    className={`w-10 h-12 flex items-center justify-center rounded-xl border-2 text-xl font-black transition-all ${val.length > i
-                            ? 'border-amber-500 bg-amber-500/20 text-amber-300'
-                            : 'border-slate-700 bg-slate-900/50 text-transparent'
-                        }`}
-                >
-                    {val.length > i ? '●' : '·'}
-                </div>
-            ))}
-            {/* Hidden input to capture keystrokes */}
+// ─── PIN Dot Display ──────────────────────────────────────────────────────────
+const PinDots: React.FC<{ value: string; inputRef: React.RefObject<HTMLInputElement | null>; onKeyDown?: (e: React.KeyboardEvent) => void; onChange: (v: string) => void; autoFocus?: boolean }> =
+    ({ value, inputRef, onKeyDown, onChange, autoFocus }) => (
+        <div className="relative">
+            {/* Invisible real input — captures keystrokes */}
             <input
+                ref={inputRef}
                 type="password"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
-                value={val}
-                onChange={e => setter(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                        if (step === 'enter') handleEnter();
-                        else if (step === 'set') handleSetPin();
-                        else handleConfirm();
-                    }
-                }}
-                autoFocus
-                className="absolute opacity-0 w-0 h-0"
+                value={value}
+                autoFocus={autoFocus}
+                onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={onKeyDown}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-default"
+                aria-label="PIN input"
             />
+            {/* Visual dot boxes — clicking focuses the hidden input */}
+            <div
+                className="flex gap-2 justify-center cursor-pointer"
+                onClick={() => inputRef.current?.focus()}
+            >
+                {[0, 1, 2, 3, 4, 5].map(i => (
+                    <div
+                        key={i}
+                        className={`w-11 h-13 py-3 flex items-center justify-center rounded-xl border-2 text-xl font-black transition-all select-none ${value.length > i
+                            ? 'border-amber-500 bg-amber-500/20 text-amber-300'
+                            : value.length === i
+                                ? 'border-amber-500/60 bg-slate-900/60 text-transparent animate-pulse'
+                                : 'border-slate-700 bg-slate-900/30 text-transparent'
+                            }`}
+                    >
+                        {value.length > i ? '●' : '·'}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 
+// ─── Vault Lock Screen ────────────────────────────────────────────────────────
+const VaultLockScreen: React.FC<{
+    hasPin: boolean;
+    onUnlock: (pin: string) => Promise<boolean>;
+    onSetPin: (pin: string) => Promise<void>;
+    onResetPin: () => Promise<void>;
+}> = ({ hasPin, onUnlock, onSetPin, onResetPin }) => {
+    const [pin, setPin] = useState('');
+    const [confirmPin, setConfirmPin] = useState('');
+    const [step, setStep] = useState<'enter' | 'set' | 'confirm' | 'resetConfirm'>(hasPin ? 'enter' : 'set');
+    const [loading, setLoading] = useState(false);
+    const [wrongAttempts, setWrongAttempts] = useState(0);
+
+    const pinRef = useRef<HTMLInputElement>(null);
+    const confirmRef = useRef<HTMLInputElement>(null);
+
+    // Auto-focus correct input when step changes
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (step === 'enter' || step === 'set') pinRef.current?.focus();
+            else if (step === 'confirm') confirmRef.current?.focus();
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [step]);
+
+    const handleEnter = async () => {
+        if (pin.length < 4) { toast.error('PIN must be at least 4 digits'); return; }
+        setLoading(true);
+        const ok = await onUnlock(pin);
+        setLoading(false);
+        if (!ok) {
+            setWrongAttempts(w => w + 1);
+            setPin('');
+            setTimeout(() => pinRef.current?.focus(), 50);
+        }
+    };
+
+    const handleSetPin = () => {
+        if (pin.length < 4) { toast.error('PIN must be at least 4 digits'); return; }
+        setStep('confirm');
+        setConfirmPin('');
+    };
+
+    const handleConfirm = async () => {
+        if (confirmPin !== pin) {
+            toast.error('PINs do not match — try again');
+            setConfirmPin('');
+            setTimeout(() => confirmRef.current?.focus(), 50);
+            return;
+        }
+        setLoading(true);
+        await onSetPin(pin);
+        setLoading(false);
+    };
+
+    const handleReset = async () => {
+        setLoading(true);
+        await onResetPin();
+        setLoading(false);
+    };
+
     return (
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/20 rounded-2xl p-10 text-center max-w-sm mx-auto shadow-2xl shadow-amber-500/5 relative overflow-hidden">
-            {/* Amber glow */}
-            <div className="absolute inset-0 bg-amber-500/3 pointer-events-none" />
+            <div className="absolute inset-0 bg-amber-500/3 pointer-events-none rounded-2xl" />
 
             <div className="relative z-10">
+                {/* Icon */}
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-5">
-                    {step === 'enter' ? (
-                        <Lock size={28} className="text-amber-400" />
-                    ) : step === 'set' ? (
-                        <Shield size={28} className="text-amber-400" />
-                    ) : (
-                        <KeyRound size={28} className="text-amber-400" />
-                    )}
+                    {step === 'enter' ? <Lock size={28} className="text-amber-400" /> :
+                        step === 'set' ? <Shield size={28} className="text-amber-400" /> :
+                            step === 'resetConfirm' ? <RotateCcw size={28} className="text-red-400" /> :
+                                <KeyRound size={28} className="text-amber-400" />}
                 </div>
 
+                {/* ── ENTER PIN ── */}
                 {step === 'enter' && (
                     <>
                         <h3 className="text-white font-black text-lg mb-1">Secure Vault</h3>
-                        <p className="text-slate-500 text-xs mb-8">Enter your vault PIN to unlock</p>
-                        <div className="relative mb-6" onClick={() => (document.querySelector('input[type=password]') as HTMLInputElement)?.focus()}>
-                            {digits(pin, setPin)}
+                        <p className="text-slate-500 text-xs mb-6">Enter your vault PIN to unlock</p>
+
+                        {wrongAttempts > 0 && (
+                            <p className="text-red-400 text-xs mb-3">
+                                ❌ Wrong PIN — {wrongAttempts} failed {wrongAttempts === 1 ? 'attempt' : 'attempts'}
+                            </p>
+                        )}
+
+                        <div className="mb-6">
+                            <PinDots value={pin} inputRef={pinRef} onChange={setPin} autoFocus
+                                onKeyDown={e => e.key === 'Enter' && handleEnter()} />
                         </div>
+
                         <button
                             onClick={handleEnter}
                             disabled={loading || pin.length < 4}
-                            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-900 font-black py-3 rounded-xl transition-all active:scale-95"
+                            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-900 font-black py-3 rounded-xl transition-all active:scale-95 mb-3"
                         >
                             {loading ? 'Verifying...' : 'Unlock Vault'}
+                        </button>
+
+                        <button
+                            onClick={() => setStep('resetConfirm')}
+                            className="text-slate-600 hover:text-slate-400 text-xs transition-colors flex items-center justify-center gap-1 w-full"
+                        >
+                            <RotateCcw size={11} /> Forgot vault PIN?
                         </button>
                     </>
                 )}
 
+                {/* ── SET NEW PIN ── */}
                 {step === 'set' && (
                     <>
                         <h3 className="text-white font-black text-lg mb-1">Set Vault PIN</h3>
                         <p className="text-slate-500 text-xs mb-2">Choose a 4–6 digit PIN for your secure vault.</p>
-                        <p className="text-amber-500/80 text-[10px] mb-8 flex items-center justify-center gap-1">
-                            <AlertTriangle size={10} /> This PIN cannot be recovered. Don't forget it.
+                        <p className="text-amber-500/70 text-[10px] mb-6 flex items-center justify-center gap-1">
+                            <AlertTriangle size={10} /> Store this PIN safely — you can reset it if forgotten.
                         </p>
-                        <div className="relative mb-6" onClick={() => (document.querySelector('input[type=password]') as HTMLInputElement)?.focus()}>
-                            {digits(pin, setPin)}
+
+                        <div className="mb-6">
+                            <PinDots value={pin} inputRef={pinRef} onChange={setPin} autoFocus
+                                onKeyDown={e => e.key === 'Enter' && handleSetPin()} />
                         </div>
+
                         <button
                             onClick={handleSetPin}
                             disabled={pin.length < 4}
                             className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-900 font-black py-3 rounded-xl transition-all active:scale-95"
                         >
-                            Set PIN
+                            Continue →
                         </button>
                     </>
                 )}
 
+                {/* ── CONFIRM PIN ── */}
                 {step === 'confirm' && (
                     <>
                         <h3 className="text-white font-black text-lg mb-1">Confirm PIN</h3>
-                        <p className="text-slate-500 text-xs mb-8">Enter the same PIN again to confirm</p>
-                        <div className="relative mb-6" onClick={() => (document.querySelectorAll('input[type=password]')[1] as HTMLInputElement)?.focus()}>
-                            {digits(confirmPin, setConfirmPin)}
+                        <p className="text-slate-500 text-xs mb-6">Enter the same PIN again to confirm</p>
+
+                        <div className="mb-6">
+                            <PinDots value={confirmPin} inputRef={confirmRef} onChange={setConfirmPin} autoFocus
+                                onKeyDown={e => e.key === 'Enter' && handleConfirm()} />
                         </div>
+
                         <div className="flex gap-3">
                             <button
                                 onClick={() => { setStep('set'); setConfirmPin(''); }}
                                 className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3 rounded-xl transition-all"
                             >
-                                Back
+                                ← Back
                             </button>
                             <button
                                 onClick={handleConfirm}
@@ -160,6 +215,39 @@ const VaultLockScreen: React.FC<{
                                 className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-900 font-black py-3 rounded-xl transition-all active:scale-95"
                             >
                                 {loading ? 'Saving...' : 'Confirm'}
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* ── RESET VAULT PIN ── */}
+                {step === 'resetConfirm' && (
+                    <>
+                        <h3 className="text-white font-black text-lg mb-1 text-red-300">Reset Vault PIN</h3>
+                        <p className="text-slate-400 text-sm mb-2">
+                            This will <strong>clear your existing vault PIN</strong> so you can set a new one.
+                        </p>
+                        <p className="text-slate-500 text-xs mb-6">
+                            Your vault notes will still be here — they're stored in Firestore. Only the PIN lock is reset. Since you're already logged in, your identity is confirmed.
+                        </p>
+
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+                            <p className="text-red-300 text-xs font-bold">⚠️ Once reset, you'll need to set a new PIN before accessing the vault.</p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setStep('enter')}
+                                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3 rounded-xl transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleReset}
+                                disabled={loading}
+                                className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-black py-3 rounded-xl transition-all active:scale-95"
+                            >
+                                {loading ? 'Resetting...' : 'Reset PIN'}
                             </button>
                         </div>
                     </>
@@ -201,7 +289,6 @@ export const Notes: React.FC = () => {
 
     const normalNotes = notes.filter((n) => !n.is_secure);
     const vaultNotes = notes.filter((n) => n.is_secure);
-
     const filteredNormal = normalNotes.filter((n) =>
         n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase())
     );
@@ -216,14 +303,15 @@ export const Notes: React.FC = () => {
         setRevealedNotes((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
     };
 
-    const handleUnlock = useCallback(async (pin: string) => {
+    const handleUnlock = useCallback(async (pin: string): Promise<boolean> => {
         const hash = await hashPin(pin);
         if (hash === storedPinHash) {
             setVaultUnlocked(true);
             toast.success('🔓 Vault unlocked');
-        } else {
-            toast.error('Wrong PIN – try again');
+            return true;
         }
+        toast.error('Wrong PIN — try again');
+        return false;
     }, [storedPinHash]);
 
     const handleSetPin = useCallback(async (pin: string) => {
@@ -236,6 +324,18 @@ export const Notes: React.FC = () => {
             toast.success('✅ Vault PIN set! Vault is now unlocked.');
         } catch {
             toast.error('Failed to save PIN');
+        }
+    }, [uid]);
+
+    const handleResetPin = useCallback(async () => {
+        if (!uid) return;
+        try {
+            await setDoc(doc(db, `apps/${APP_ID}/users`, uid), { vault_pin_hash: null }, { merge: true });
+            setStoredPinHash(null);
+            setVaultUnlocked(false);
+            toast.success('Vault PIN reset. Set a new PIN below.');
+        } catch {
+            toast.error('Failed to reset PIN');
         }
     }, [uid]);
 
@@ -313,6 +413,7 @@ export const Notes: React.FC = () => {
                         hasPin={!!storedPinHash}
                         onUnlock={handleUnlock}
                         onSetPin={handleSetPin}
+                        onResetPin={handleResetPin}
                     />
                 ) : (
                     vaultNotes.length === 0 ? (
