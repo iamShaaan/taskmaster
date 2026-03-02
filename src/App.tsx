@@ -58,11 +58,16 @@ const DataLoader: React.FC = () => {
       } as unknown as Note)));
     }, where('owner_id', '==', user.uid), orderBy('updated_at', 'desc')));
 
-    // Shared items: All users of the app can see clients and projects
+    // Clients are now private by default
     unsubs.push(listenCollection('clients', (data) => {
       setClients(data.map((d) => ({ ...d, created_at: toDate(d.created_at as never) || new Date() } as unknown as Client)));
-    }));
+    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
 
+    // Projects: Visible if owner OR if user is in shared_with array
+    // Note: Firestore doesn't support 'where(OR)' easily with 'array-contains' in a single query reliably with other constraints.
+    // However, we can use a simpler approach: fetch where owner OR fetch where shared_with (though onSnapshot is per-query).
+    // Alternative: Just fetch everything and filter in-memory if team size is small, OR do two separate listeners.
+    // For now, let's use the 'shared_with' if we can, or just implement the ownership for now and then add sharing.
     unsubs.push(listenCollection('projects', (data) => {
       setProjects(data.map((d) => ({
         ...d,
@@ -73,7 +78,24 @@ const DataLoader: React.FC = () => {
           duration_ms: l.duration_ms as number,
         })),
       } as unknown as Project)));
-    }));
+    }, where('owner_id', '==', user.uid)));
+
+    // Second listener for shared projects
+    unsubs.push(listenCollection('projects', (data) => {
+      const sharedProjects = data.map((d) => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date(),
+        time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
+          start: toDate(l.start as never) || new Date(),
+          end: toDate(l.end as never) || new Date(),
+          duration_ms: l.duration_ms as number,
+        })),
+      } as unknown as Project));
+
+      // We need to merge this with the owned projects in the store. 
+      // This requires a store update to handle merging instead of just setting.
+      setProjects([...useAppStore.getState().projects, ...sharedProjects].filter((p, i, a) => a.findIndex(t => t.id === p.id) === i));
+    }, where('shared_with', 'array-contains', user.uid)));
 
     return () => unsubs.forEach((u) => u());
   }, [user, setTasks, setMeetings, setClients, setProjects, setNotes]);

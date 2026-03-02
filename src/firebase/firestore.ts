@@ -24,9 +24,19 @@ export const createDoc = async (path: string, data: Record<string, unknown>) => 
     const ref = await addDoc(col(path), {
         ...data,
         owner_id: user?.uid || null,
-        created_at: serverTimestamp()
+        shared_with: data.shared_with || [],
+        created_at: serverTimestamp(),
+        // Ensure standard fields for global dashboard
+        status: data.status || 'open',
+        priority: data.priority || 'medium',
     });
     return ref.id;
+};
+
+export const searchUsers = async (email: string) => {
+    const q = query(col('users'), where('email', '==', email));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
 export const updateDocById = async (path: string, id: string, data: Record<string, unknown>) => {

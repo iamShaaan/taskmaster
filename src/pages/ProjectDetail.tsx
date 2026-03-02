@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FolderKanban, CheckSquare, Calendar,
-    FileArchive, Play, Square, Timer, Upload, ExternalLink
+    FileArchive, Play, Square, Timer, Upload, ExternalLink, Users
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
@@ -246,9 +246,101 @@ export const ProjectDetail: React.FC = () => {
                             )}
                         </div>
                     </section>
+
+                    {/* Team Management */}
+                    <TeamMembers project={project} />
                 </div>
 
             </div>
         </div>
+    );
+};
+
+const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
+    const [email, setEmail] = useState('');
+    const [searching, setSearching] = useState(false);
+    const isOwner = auth.currentUser?.uid === project.owner_id;
+
+    const handleAddMember = async () => {
+        if (!email.trim()) return;
+        setSearching(true);
+        try {
+            const { searchUsers, updateDocById } = await import('../firebase/firestore');
+            const users = await searchUsers(email.trim());
+
+            if (users.length === 0) {
+                toast.error('User not found');
+                return;
+            }
+
+            const userToAdd = users[0] as any;
+            if (project.shared_with?.includes(userToAdd.uid) || project.owner_id === userToAdd.uid) {
+                toast.error('User already has access');
+                return;
+            }
+
+            const updatedSharedWith = [...(project.shared_with || []), userToAdd.uid];
+            await updateDocById('projects', project.id, { shared_with: updatedSharedWith });
+            toast.success(`${userToAdd.displayName} added to team`);
+            setEmail('');
+        } catch (error) {
+            toast.error('Failed to add member');
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    return (
+        <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6">
+            <h2 className="text-slate-100 font-bold mb-4 flex items-center gap-2">
+                <Users size={18} className="text-emerald-400" /> Team Members
+            </h2>
+
+            {isOwner && (
+                <div className="flex gap-2 mb-6">
+                    <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Invite by email..."
+                        className="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
+                    />
+                    <button
+                        onClick={handleAddMember}
+                        disabled={searching || !email.trim()}
+                        className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                    >
+                        {searching ? '...' : 'Invite'}
+                    </button>
+                </div>
+            )}
+
+            <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                            O
+                        </div>
+                        <div>
+                            <p className="text-slate-200 text-sm font-medium">Project Owner</p>
+                            <p className="text-slate-500 text-[10px]">Full Access</p>
+                        </div>
+                    </div>
+                </div>
+                {project.shared_with?.map((uid: string) => (
+                    <div key={uid} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
+                                T
+                            </div>
+                            <div>
+                                <p className="text-slate-200 text-sm font-medium">Team Member</p>
+                                <p className="text-slate-500 text-[10px]">{uid === auth.currentUser?.uid ? 'You' : 'Collaborator'}</p>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 };

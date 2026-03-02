@@ -14,6 +14,7 @@ export interface Task {
     time_logs: TimeLog[];
     total_time_ms: number;
     tags: string[];
+    owner_id: string;
 }
 
 export interface TimeLog {
@@ -47,6 +48,7 @@ export interface Client {
     files: FileAttachment[];
     created_at: Date;
     tags: string[];
+    owner_id: string;
 }
 
 export interface Project {
@@ -60,6 +62,8 @@ export interface Project {
     color: string;
     time_logs?: TimeLog[];
     total_time_ms?: number;
+    owner_id: string;
+    shared_with: string[]; // Array of UIDs
 }
 
 export interface Note {

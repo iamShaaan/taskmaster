@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { auth, db, APP_ID } from '../firebase/config';
+import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { Sparkles, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,11 +18,25 @@ export const Auth: React.FC = () => {
         setLoading(true);
         try {
             if (isLogin) {
-                await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                // Sync profile on login
+                await setDoc(doc(db, `apps/${APP_ID}/users`, userCredential.user.uid), {
+                    uid: userCredential.user.uid,
+                    email: userCredential.user.email,
+                    displayName: userCredential.user.displayName || 'User',
+                    updated_at: serverTimestamp()
+                }, { merge: true });
                 toast.success('Welcome back!');
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 await updateProfile(userCredential.user, { displayName: name });
+                // Create profile on signup
+                await setDoc(doc(db, `apps/${APP_ID}/users`, userCredential.user.uid), {
+                    uid: userCredential.user.uid,
+                    email: userCredential.user.email,
+                    displayName: name,
+                    created_at: serverTimestamp()
+                });
                 toast.success('Account created successfully!');
             }
         } catch (error: any) {

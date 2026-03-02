@@ -17,6 +17,7 @@ interface AppStore {
     // Projects
     projects: Project[];
     setProjects: (projects: Project[]) => void;
+    addProjects: (projects: Project[]) => void;
 
     // Notes
     notes: Note[];
@@ -48,6 +49,9 @@ export const useAppStore = create<AppStore>((set) => ({
 
     projects: [],
     setProjects: (projects) => set({ projects }),
+    addProjects: (newProjects) => set((state) => ({
+        projects: [...state.projects, ...newProjects].filter((p, i, a) => a.findIndex(t => t.id === p.id) === i)
+    })),
 
     notes: [],
     setNotes: (notes) => set({ notes }),
