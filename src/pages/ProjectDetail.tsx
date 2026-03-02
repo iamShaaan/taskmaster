@@ -10,6 +10,7 @@ import { statusBadge } from '../components/ui/Badge';
 import { formatDate, formatDuration } from '../utils/timeFormat';
 import { useTimer } from '../hooks/useTimer';
 import { useDropzone } from 'react-dropzone';
+import { auth } from '../firebase/config';
 import { uploadFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
@@ -31,6 +32,12 @@ export const ProjectDetail: React.FC = () => {
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         if (!project) return;
+
+        if (!auth.currentUser) {
+            toast.error('Upload Failed: You must be authenticated. Enable "Anonymous Auth" in Firebase Console.');
+            return;
+        }
+
         setUploading(true);
         try {
             const uploadedUrls = await Promise.all(
