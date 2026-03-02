@@ -19,6 +19,7 @@ import { Sparkles } from 'lucide-react';
 import { ClientDetail } from './pages/ClientDetail';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Profile } from './pages/Profile';
+import { InviteAccept } from './pages/InviteAccept';
 
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -132,6 +133,8 @@ function App() {
         }}
       />
       <Routes>
+        {/* Public invite route — accessible without auth */}
+        <Route path="/invite" element={<InviteAccept />} />
         {!user ? (
           <Route path="*" element={<Auth />} />
         ) : (

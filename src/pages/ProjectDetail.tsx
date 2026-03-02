@@ -301,35 +301,70 @@ export const ProjectDetail: React.FC = () => {
 
 const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
     const [email, setEmail] = useState('');
-    const [searching, setSearching] = useState(false);
+    const [inviting, setInviting] = useState(false);
+    const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
     const isOwner = auth.currentUser?.uid === project.owner_id;
 
-    const handleAddMember = async () => {
+    const handleSendInvite = async () => {
         if (!email.trim()) return;
-        setSearching(true);
+        const emailLower = email.trim().toLowerCase();
+
+        if (project.pending_invites?.includes(emailLower)) {
+            toast.error('An invite was already sent to this email');
+            return;
+        }
+
+        setInviting(true);
         try {
-            const { searchUsers, updateDocById } = await import('../firebase/firestore');
-            const users = await searchUsers(email.trim());
+            const { addDoc, collection, doc, setDoc, serverTimestamp: sts } = await import('firebase/firestore');
+            const { db: firestoreDb, APP_ID: appId } = await import('../firebase/config');
 
-            if (users.length === 0) {
-                toast.error('User not found');
-                return;
-            }
+            const user = auth.currentUser!;
+            const token = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
 
-            const userToAdd = users[0] as any;
-            if (project.shared_with?.includes(userToAdd.uid) || project.owner_id === userToAdd.uid) {
-                toast.error('User already has access');
-                return;
-            }
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 7);
 
-            const updatedSharedWith = [...(project.shared_with || []), userToAdd.uid];
-            await updateDocById('projects', project.id, { shared_with: updatedSharedWith });
-            toast.success(`${userToAdd.displayName} added to team`);
+            const inviteRef = doc(firestoreDb, `apps/${appId}/invitations/${token}`);
+            await setDoc(inviteRef, {
+                token,
+                project_id: project.id,
+                project_name: project.name,
+                invited_email: emailLower,
+                invited_by: user.uid,
+                invited_by_name: user.displayName || user.email,
+                status: 'pending',
+                created_at: sts(),
+                expires_at: expiresAt,
+            });
+
+            const inviteLink = `${window.location.origin}/invite?token=${token}`;
+
+            await addDoc(collection(firestoreDb, `apps/${appId}/actions`), {
+                action_type: 'send_invitation_email',
+                payload: {
+                    to_email: emailLower,
+                    invite_link: inviteLink,
+                    project_name: project.name,
+                    invited_by_name: user.displayName || user.email,
+                },
+                status: 'pending',
+                created_at: sts(),
+                owner_id: user.uid,
+            });
+
+            const updatedPending = [...(project.pending_invites || []), emailLower];
+            await updateDocById('projects', project.id, { pending_invites: updatedPending });
+
+            setLastInviteLink(inviteLink);
             setEmail('');
+            toast.success(`Invite created for ${emailLower}`);
         } catch (error) {
-            toast.error('Failed to add member');
+            console.error(error);
+            toast.error('Failed to send invite');
         } finally {
-            setSearching(false);
+            setInviting(false);
         }
     };
 
@@ -340,30 +375,47 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
             </h2>
 
             {isOwner && (
-                <div className="flex gap-2 mb-6">
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Invite by email..."
-                        className="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
-                    />
-                    <button
-                        onClick={handleAddMember}
-                        disabled={searching || !email.trim()}
-                        className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
-                    >
-                        {searching ? '...' : 'Invite'}
-                    </button>
+                <div className="mb-6 space-y-3">
+                    <div className="flex gap-2">
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendInvite()}
+                            placeholder="Invite by email..."
+                            className="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
+                        />
+                        <button
+                            onClick={handleSendInvite}
+                            disabled={inviting || !email.trim()}
+                            className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                        >
+                            {inviting ? '...' : 'Invite'}
+                        </button>
+                    </div>
+
+                    {lastInviteLink && (
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1.5">
+                            <p className="text-emerald-400 text-xs font-bold">✓ Invite ready — share this link:</p>
+                            <div className="flex items-center gap-2">
+                                <code className="text-emerald-300 text-[10px] break-all flex-1 bg-black/20 px-2 py-1.5 rounded-lg">{lastInviteLink}</code>
+                                <button
+                                    onClick={() => { navigator.clipboard.writeText(lastInviteLink); toast.success('Copied!'); }}
+                                    className="text-emerald-400 hover:text-emerald-300 text-xs font-bold px-2 py-1.5 bg-emerald-500/20 rounded-lg transition-colors shrink-0"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                            <p className="text-slate-500 text-[10px]">Link expires in 7 days. Email delivery needs n8n setup.</p>
+                        </div>
+                    )}
                 </div>
             )}
 
             <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
-                            O
-                        </div>
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">O</div>
                         <div>
                             <p className="text-slate-200 text-sm font-medium">Project Owner</p>
                             <p className="text-slate-500 text-[10px]">Full Access</p>
@@ -373,12 +425,21 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
                 {project.shared_with?.map((uid: string) => (
                     <div key={uid} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
-                                T
-                            </div>
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">T</div>
                             <div>
                                 <p className="text-slate-200 text-sm font-medium">Team Member</p>
                                 <p className="text-slate-500 text-[10px]">{uid === auth.currentUser?.uid ? 'You' : 'Collaborator'}</p>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                {project.pending_invites?.map((invEmail: string) => (
+                    <div key={invEmail} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-amber-500/10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">P</div>
+                            <div>
+                                <p className="text-slate-300 text-sm font-medium truncate max-w-[160px]">{invEmail}</p>
+                                <p className="text-amber-500/80 text-[10px]">Invite Pending</p>
                             </div>
                         </div>
                     </div>
@@ -387,3 +448,4 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
         </section>
     );
 };
+

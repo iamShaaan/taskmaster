@@ -1,21 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to reach their own app data scope
-    match /apps/{appId}/{collection}/{docId} {
-      allow read, write: if request.auth != null && (
-        resource == null || 
-        resource.data.owner_id == request.auth.uid ||
-        (resource.data.shared_with is list && request.auth.uid in resource.data.shared_with)
-      );
-    }
-    
-    // User Profiles
+
+    // ─── User Profiles ─────────────────────────────────────────────────────
+    // Any authenticated user can READ profiles (needed for invite lookups).
+    // Only the profile owner can WRITE their own profile.
     match /apps/{appId}/users/{userId} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || (request.auth.token.email != null && request.auth.token.email == userId));
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Generic fallback for list operations (security via query filters)
+    // ─── Invitations ───────────────────────────────────────────────────────
+    // Anyone can read an invite by token (needed before login to validate).
+    // Only authenticated users can create/update invites.
+    match /apps/{appId}/invitations/{token} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
+    // ─── App Data (tasks, projects, clients, notes, meetings, actions…) ────
+    // Owner has full access. Shared members have read + create (add notes etc.)
+    // but NOT delete or update existing docs.
+    match /apps/{appId}/{collection}/{docId} {
+      // Full access for document owner
+      allow read, write: if request.auth != null
+        && resource != null
+        && resource.data.owner_id == request.auth.uid;
+
+      // Shared-members: read + create (can add new docs like notes)
+      allow read, create: if request.auth != null
+        && resource != null
+        && resource.data.shared_with is list
+        && request.auth.uid in resource.data.shared_with;
+
+      // Allow create when doc doesn't exist yet (new documents always pass)
+      allow create: if request.auth != null && resource == null;
+    }
+
+    // ─── Collection-level list (needed for Firestore queries) ──────────────
     match /apps/{appId}/{collection} {
       allow list: if request.auth != null;
     }
