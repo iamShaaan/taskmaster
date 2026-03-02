@@ -41,12 +41,16 @@ interface EditViewProps {
     setProfile: React.Dispatch<React.SetStateAction<Partial<UserProfile>>>;
     newMemberEmail: string;
     setNewMemberEmail: React.Dispatch<React.SetStateAction<string>>;
+    newPortfolioUrl: string;
+    setNewPortfolioUrl: React.Dispatch<React.SetStateAction<string>>;
     saving: boolean;
     onSave: () => void;
     onDiscard: () => void;
     onFileUpload: (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'signature') => void;
     onAddMember: () => void;
     onRemoveMember: (email: string) => void;
+    onAddPortfolio: () => void;
+    onRemovePortfolio: (url: string) => void;
 }
 
 // ─── Dashboard View (STABLE TOP-LEVEL COMPONENT) ─────────────────────────────
@@ -93,12 +97,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
                                 <div className="p-1.5 bg-emerald-500/20 rounded-lg"><CheckCircle2 size={16} className="text-emerald-400" /></div>
                                 <span className="text-slate-200 font-black">{stats.completionRate}% <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Done</span></span>
                             </div>
-                            {profile.websites?.[0] && (
-                                <a href={profile.websites[0]} target="_blank" rel="noopener noreferrer" className="bg-indigo-500/10 border border-indigo-500/20 px-5 py-2.5 rounded-2xl flex items-center gap-3 hover:bg-indigo-500/20 transition-all cursor-alias group">
+                            {(profile.websites || []).map((url, i) => (
+                                <a key={i} href={url.startsWith('http') ? url : `https://${url}`} target="_blank" rel="noopener noreferrer"
+                                    className="bg-indigo-500/10 border border-indigo-500/20 px-5 py-2.5 rounded-2xl flex items-center gap-3 hover:bg-indigo-500/20 transition-all group">
                                     <Globe size={16} className="text-indigo-400 group-hover:rotate-12 transition-transform" />
-                                    <span className="text-indigo-300 font-bold text-xs uppercase tracking-widest">Portfolio</span>
+                                    <span className="text-indigo-300 font-bold text-xs uppercase tracking-widest">{getHostname(url)}</span>
                                 </a>
-                            )}
+                            ))}
                         </div>
                     </div>
 
@@ -188,10 +193,22 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
                         </div>
                         <div className="space-y-2">
                             <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Portfolio Nexus</span>
-                            <div className="flex items-center gap-3 text-slate-200 font-bold bg-slate-950/40 p-3 rounded-2xl border border-white/5">
-                                <ExternalLink size={14} className="text-slate-500" />
-                                <span className="text-xs truncate">{profile.websites?.[0] ? getHostname(profile.websites[0]) : "None linked"}</span>
-                            </div>
+                            {(profile.websites && profile.websites.length > 0) ? (
+                                <div className="space-y-2">
+                                    {profile.websites.map((url, i) => (
+                                        <a key={i} href={url.startsWith('http') ? url : `https://${url}`} target="_blank" rel="noopener noreferrer"
+                                            className="flex items-center gap-3 text-slate-200 font-bold bg-slate-950/40 p-3 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all group">
+                                            <ExternalLink size={14} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
+                                            <span className="text-xs truncate group-hover:text-indigo-300 transition-colors">{getHostname(url)}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 text-slate-200 font-bold bg-slate-950/40 p-3 rounded-2xl border border-white/5">
+                                    <ExternalLink size={14} className="text-slate-500" />
+                                    <span className="text-xs text-slate-500">None linked</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -250,7 +267,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
 // ─── Edit View (STABLE TOP-LEVEL COMPONENT) ───────────────────────────────────
 const EditView: React.FC<EditViewProps> = ({
     profile, setProfile, newMemberEmail, setNewMemberEmail,
-    saving, onSave, onDiscard, onFileUpload, onAddMember, onRemoveMember
+    newPortfolioUrl, setNewPortfolioUrl,
+    saving, onSave, onDiscard, onFileUpload, onAddMember, onRemoveMember,
+    onAddPortfolio, onRemovePortfolio
 }) => (
     <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
@@ -353,14 +372,39 @@ const EditView: React.FC<EditViewProps> = ({
                             placeholder="billing@agency.com"
                         />
                     </div>
-                    <div className="space-y-3">
-                        <label className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] ml-1">Digital Footprint (URL)</label>
-                        <input
-                            className="w-full bg-slate-950/50 border border-white/5 rounded-2xl px-5 py-4 text-white focus:border-indigo-500/50 outline-none transition-all font-bold"
-                            value={profile.websites?.[0] || ''}
-                            onChange={(e) => setProfile(p => ({ ...p, websites: [e.target.value] }))}
-                            placeholder="https://agency.com"
-                        />
+                    <div className="space-y-3 md:col-span-2">
+                        <label className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] ml-1">Portfolio &amp; Links</label>
+                        <div className="flex gap-3">
+                            <div className="relative flex-1">
+                                <Globe size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
+                                <input
+                                    className="w-full bg-slate-950/50 border border-white/5 rounded-2xl px-5 py-4 pl-12 text-white focus:border-indigo-500/50 outline-none transition-all font-bold"
+                                    value={newPortfolioUrl}
+                                    onChange={(e) => setNewPortfolioUrl(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), onAddPortfolio())}
+                                    placeholder="https://linkedin.com/in/yourname"
+                                />
+                            </div>
+                            <button
+                                onClick={onAddPortfolio}
+                                className="bg-slate-800 hover:bg-slate-700 text-white px-8 rounded-2xl font-black transition-all"
+                            >
+                                Add
+                            </button>
+                        </div>
+                        {(profile.websites || []).length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-2">
+                                {(profile.websites || []).map((url, i) => (
+                                    <div key={i} className="flex items-center gap-2 bg-slate-800 border border-white/5 px-4 py-2 rounded-2xl group">
+                                        <Globe size={12} className="text-indigo-400" />
+                                        <span className="text-slate-200 text-xs font-bold max-w-[200px] truncate">{getHostname(url)}</span>
+                                        <button onClick={() => onRemovePortfolio(url)} className="text-slate-600 hover:text-red-400 transition-colors ml-1">
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -458,6 +502,7 @@ export const Profile: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [profile, setProfile] = useState<Partial<UserProfile>>({});
     const [newMemberEmail, setNewMemberEmail] = useState('');
+    const [newPortfolioUrl, setNewPortfolioUrl] = useState('');
 
     const [stats, setStats] = useState({
         score: 0,
@@ -579,6 +624,21 @@ export const Profile: React.FC = () => {
         }));
     };
 
+    const addPortfolio = () => {
+        if (!newPortfolioUrl.trim()) return;
+        const url = newPortfolioUrl.trim();
+        if ((profile.websites || []).includes(url)) {
+            toast.error('Link already added');
+            return;
+        }
+        setProfile(p => ({ ...p, websites: [...(p.websites || []), url] }));
+        setNewPortfolioUrl('');
+    };
+
+    const removePortfolio = (url: string) => {
+        setProfile(p => ({ ...p, websites: (p.websites || []).filter(w => w !== url) }));
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="animate-spin text-indigo-500" size={32} />
@@ -593,12 +653,16 @@ export const Profile: React.FC = () => {
                     setProfile={setProfile}
                     newMemberEmail={newMemberEmail}
                     setNewMemberEmail={setNewMemberEmail}
+                    newPortfolioUrl={newPortfolioUrl}
+                    setNewPortfolioUrl={setNewPortfolioUrl}
                     saving={saving}
                     onSave={handleSave}
                     onDiscard={() => setIsEditing(false)}
                     onFileUpload={handleFileUpload}
                     onAddMember={addTeamMember}
                     onRemoveMember={removeTeamMember}
+                    onAddPortfolio={addPortfolio}
+                    onRemovePortfolio={removePortfolio}
                 />
             ) : (
                 <DashboardView
