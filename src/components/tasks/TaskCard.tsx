@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tag, Calendar, Play, Square, Timer, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Tag, Calendar, Play, Square, Timer, Pencil, Trash2, Loader2, Users, FolderKanban } from 'lucide-react';
 import type { Task } from '../../types';
 import { statusBadge, priorityBadge, typeBadge } from '../ui/Badge';
 import { formatDuration, formatDate, isOverdue } from '../../utils/timeFormat';
 import { useTimer } from '../../hooks/useTimer';
 import { deleteDocById, updateDocById } from '../../firebase/firestore';
 import { auth } from '../../firebase/config';
+import { useAppStore } from '../../store';
 import toast from 'react-hot-toast';
 
 interface TaskCardProps {
@@ -19,6 +20,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
     const { isRunning, elapsed, start, stop } = useTimer(task.id, task.time_logs || []);
     const overdue = task.due_date ? isOverdue(task.due_date) && task.status !== 'done' : false;
     const [deleting, setDeleting] = useState(false);
+
+    // Resolve client and project names from store
+    const { clients, projects } = useAppStore();
+    const clientName = task.client_id ? clients.find(c => c.id === task.client_id)?.name : null;
+    const projectName = task.project_id ? projects.find(p => p.id === task.project_id)?.name : null;
 
     const handleDelete = async () => {
         if (!confirm('Delete this task? You can restore it from Archive within 30 days.')) return;
@@ -81,13 +87,29 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
 
             {/* Meta info */}
             {!compact && (
-                <div className="space-y-2 mb-4">
+                <div className="space-y-1.5 mb-4">
+                    {/* Client */}
+                    {clientName && (
+                        <div className="flex items-center gap-2 text-xs py-1 px-2 rounded-md text-emerald-300 bg-emerald-500/10 border border-emerald-500/10">
+                            <Users size={11} className="flex-shrink-0" />
+                            <span className="font-medium truncate">{clientName}</span>
+                        </div>
+                    )}
+                    {/* Project */}
+                    {projectName && (
+                        <div className="flex items-center gap-2 text-xs py-1 px-2 rounded-md text-indigo-300 bg-indigo-500/10 border border-indigo-500/10">
+                            <FolderKanban size={11} className="flex-shrink-0" />
+                            <span className="font-medium truncate">{projectName}</span>
+                        </div>
+                    )}
+                    {/* Due date */}
                     {task.due_date && (
                         <div className={`flex items-center gap-2 text-xs py-1 px-2 rounded-md ${overdue ? 'text-red-300 bg-red-500/10' : 'text-slate-400 bg-slate-800/50'}`}>
                             <Calendar size={13} className={overdue ? 'animate-pulse' : ''} />
                             <span className="font-medium">{overdue ? 'Overdue · ' : ''}{formatDate(task.due_date)}</span>
                         </div>
                     )}
+                    {/* Tags */}
                     {task.tags?.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap pl-1">
                             {task.tags.map((t) => (

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store';
 import { createDoc, updateDocById } from '../../firebase/firestore';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
-import { X, Plus, Tag } from 'lucide-react';
+import { X, Plus, Tag, Users, FolderKanban } from 'lucide-react';
 
 interface TaskFormProps {
     onClose: () => void;
@@ -28,6 +28,26 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
         client_id: editTask?.client_id || '',
         tags: editTask?.tags || [] as string[],
     });
+
+    // When client changes: clear project if it doesn't belong to the new client
+    const handleClientChange = (clientId: string) => {
+        setForm(f => {
+            const projectStillValid = projectsForClient(clientId).some(p => p.id === f.project_id);
+            return { ...f, client_id: clientId, project_id: projectStillValid ? f.project_id : '' };
+        });
+    };
+
+    // Filter projects by selected client (if client is picked); otherwise show all
+    const projectsForClient = (clientId: string) => {
+        if (!clientId) return projects;
+        return projects.filter(p => p.client_id === clientId);
+    };
+
+    const filteredProjects = useMemo(
+        () => projectsForClient(form.client_id),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [form.client_id, projects]
+    );
 
     const set = (k: string, v: string | string[]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -73,14 +93,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Title */}
             <div>
                 <label className={labelCls}>Title *</label>
                 <input className={inputCls} placeholder="What needs to be done?" value={form.title} onChange={(e) => set('title', e.target.value)} />
             </div>
+
+            {/* Description */}
             <div>
                 <label className={labelCls}>Description</label>
-                <textarea className={`${inputCls} resize-none`} rows={3} placeholder="Add more details..." value={form.description} onChange={(e) => set('description', e.target.value)} />
+                <textarea className={`${inputCls} resize-none`} rows={2} placeholder="Add more details..." value={form.description} onChange={(e) => set('description', e.target.value)} />
             </div>
+
+            {/* Type / Priority / Status */}
             <div className="grid grid-cols-3 gap-3">
                 <div>
                     <label className={labelCls}>Type</label>
@@ -108,30 +133,50 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
                     </select>
                 </div>
             </div>
+
+            {/* Client + Project — always visible, project filtered by client */}
             <div className="grid grid-cols-2 gap-3">
                 <div>
-                    <label className={labelCls}>Due Date</label>
-                    <input type="datetime-local" className={inputCls} value={form.due_date} onChange={(e) => set('due_date', e.target.value)} />
+                    <label className={labelCls}>
+                        <span className="flex items-center gap-1"><Users size={11} /> Client</span>
+                    </label>
+                    <select
+                        className={inputCls}
+                        value={form.client_id}
+                        onChange={(e) => handleClientChange(e.target.value)}
+                    >
+                        <option value="">— No client —</option>
+                        {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
                 </div>
-                {form.type === 'project' && (
-                    <div>
-                        <label className={labelCls}>Project</label>
-                        <select className={inputCls} value={form.project_id} onChange={(e) => set('project_id', e.target.value)}>
-                            <option value="">Select project</option>
-                            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                )}
-                {form.type === 'client' && (
-                    <div>
-                        <label className={labelCls}>Client</label>
-                        <select className={inputCls} value={form.client_id} onChange={(e) => set('client_id', e.target.value)}>
-                            <option value="">Select client</option>
-                            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                    </div>
-                )}
+                <div>
+                    <label className={labelCls}>
+                        <span className="flex items-center gap-1">
+                            <FolderKanban size={11} />
+                            Project{form.client_id && filteredProjects.length < projects.length ? ` (${filteredProjects.length} for client)` : ''}
+                        </span>
+                    </label>
+                    <select
+                        className={inputCls}
+                        value={form.project_id}
+                        onChange={(e) => set('project_id', e.target.value)}
+                        disabled={filteredProjects.length === 0}
+                    >
+                        <option value="">— No project —</option>
+                        {filteredProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    {form.client_id && filteredProjects.length === 0 && (
+                        <p className="text-slate-600 text-[10px] mt-1">No projects linked to this client yet</p>
+                    )}
+                </div>
             </div>
+
+            {/* Due Date */}
+            <div>
+                <label className={labelCls}>Due Date</label>
+                <input type="datetime-local" className={inputCls} value={form.due_date} onChange={(e) => set('due_date', e.target.value)} />
+            </div>
+
             {/* Tags */}
             <div>
                 <label className={labelCls}>Tags</label>
@@ -152,6 +197,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
                     </div>
                 )}
             </div>
+
             <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-100 transition-colors">Cancel</button>
                 <button type="submit" disabled={loading} className="px-5 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50">
