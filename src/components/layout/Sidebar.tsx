@@ -35,6 +35,7 @@ export const Sidebar: React.FC = () => {
     const { user, logout } = useAuth();
     const activeTask = tasks.find((t) => t.id === activeTimerId);
     const [photoURL, setPhotoURL] = useState<string | null>(null);
+    const [displayName, setDisplayName] = useState<string | null>(null);
 
     // Live-listen to the user's profile photo from Firestore
     useEffect(() => {
@@ -42,11 +43,12 @@ export const Sidebar: React.FC = () => {
         const unsub = onSnapshot(doc(db, `apps/${APP_ID}/users`, user.uid), (snap) => {
             const data = snap.data();
             setPhotoURL(data?.photoURL || null);
+            setDisplayName(data?.displayName || null);
         });
         return unsub;
     }, [user?.uid]);
 
-    const initials = user?.displayName?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || '?';
+    const resolvedName = displayName || user?.displayName || user?.email?.split('@')[0] || 'User';
 
     return (
         <aside
@@ -126,13 +128,13 @@ export const Sidebar: React.FC = () => {
                                 />
                             ) : (
                                 <div className="w-full h-full bg-slate-800 flex items-center justify-center text-indigo-400 font-bold text-sm">
-                                    {initials}
+                                    {resolvedName.charAt(0).toUpperCase()}
                                 </div>
                             )}
                         </div>
                         {sidebarOpen && (
                             <div className="flex-1 min-w-0">
-                                <p className="text-slate-200 text-sm font-bold truncate">{user.displayName || 'User'}</p>
+                                <p className="text-slate-200 text-sm font-bold truncate">{resolvedName}</p>
                                 <p className="text-slate-500 text-[10px] truncate">{user.email}</p>
                             </div>
                         )}
