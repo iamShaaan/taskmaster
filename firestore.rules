@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to reach their own app data scope
+    match /apps/{appId}/{collection}/{docId} {
+      allow read, write: if request.auth != null && (
+        resource == null || 
+        resource.data.owner_id == request.auth.uid ||
+        (resource.data.shared_with is list && request.auth.uid in resource.data.shared_with)
+      );
+    }
+    
+    // User Profiles
+    match /apps/{appId}/users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Generic fallback for list operations (security via query filters)
+    match /apps/{appId}/{collection} {
+      allow list: if request.auth != null;
+    }
+  }
+}
