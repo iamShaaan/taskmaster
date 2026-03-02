@@ -46,7 +46,17 @@ export const ClientForm: React.FC<ClientFormProps> = ({ onClose, editClient }) =
         if (!form.name.trim()) { toast.error('Client name is required'); return; }
         setLoading(true);
         try {
-            const data = { ...form, files: editClient?.files || [] };
+            // Auto-commit any pending phone/email that was typed but not yet added via the + button
+            const finalPhones = [...form.phones];
+            if (phoneInput.trim() && !finalPhones.includes(phoneInput.trim())) {
+                finalPhones.push(phoneInput.trim());
+            }
+            const finalEmails = [...form.emails];
+            if (emailInput.trim() && !finalEmails.includes(emailInput.trim())) {
+                finalEmails.push(emailInput.trim());
+            }
+
+            const data = { ...form, phones: finalPhones, emails: finalEmails, files: editClient?.files || [] };
             if (editClient) {
                 await updateDocById('clients', editClient.id, data as Record<string, unknown>);
                 toast.success('Client updated!');
@@ -62,6 +72,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({ onClose, editClient }) =
             setLoading(false);
         }
     };
+
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
