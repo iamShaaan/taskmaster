@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ─── User Profiles ─────────────────────────────────────────────────────
-    // Any authenticated user can READ profiles (needed for invite lookups).
+    // Any authenticated user can READ profiles (invite lookup, display names).
     // Only the profile owner can WRITE their own profile.
     match /apps/{appId}/users/{userId} {
       allow read: if request.auth != null;
@@ -19,26 +19,51 @@ service cloud.firestore {
       allow update: if request.auth != null;
     }
 
-    // ─── App Data (tasks, projects, clients, notes, meetings, actions…) ────
-    // Owner has full access. Shared members have read + create (add notes etc.)
-    // but NOT delete or update existing docs.
-    match /apps/{appId}/{collection}/{docId} {
-      // Full access for document owner
+    // ─── Projects (special handling for shared_with) ───────────────────────
+    match /apps/{appId}/projects/{docId} {
+      // Owner: full access
       allow read, write: if request.auth != null
         && resource != null
         && resource.data.owner_id == request.auth.uid;
 
-      // Shared-members: read + create (can add new docs like notes)
-      allow read, create: if request.auth != null
+      // Shared members: read + create new sub-docs (notes etc.)
+      allow read: if request.auth != null
         && resource != null
         && resource.data.shared_with is list
         && request.auth.uid in resource.data.shared_with;
 
-      // Allow create when doc doesn't exist yet (new documents always pass)
+      // ✅ Invite self-acceptance:
+      // Allow a user to add ONLY themselves to shared_with if:
+      //   1. Their verified Firebase email is in pending_invites
+      //   2. The update only adds their UID to shared_with (no other changes to that field)
+      //   3. They are not already in shared_with
+      allow update: if request.auth != null
+        && resource != null
+        && resource.data.pending_invites is list
+        && request.auth.token.email in resource.data.pending_invites
+        && request.resource.data.shared_with is list
+        && request.auth.uid in request.resource.data.shared_with
+        && !(request.auth.uid in resource.data.shared_with);
+    }
+
+    // ─── All other app data (tasks, clients, notes, meetings, actions…) ────
+    match /apps/{appId}/{collection}/{docId} {
+      // Owner: full access
+      allow read, write: if request.auth != null
+        && resource != null
+        && resource.data.owner_id == request.auth.uid;
+
+      // Shared members: read only
+      allow read: if request.auth != null
+        && resource != null
+        && resource.data.shared_with is list
+        && request.auth.uid in resource.data.shared_with;
+
+      // New document creation (resource == null → no owner yet)
       allow create: if request.auth != null && resource == null;
     }
 
-    // ─── Collection-level list (needed for Firestore queries) ──────────────
+    // ─── Collection-level list (Firestore query support) ───────────────────
     match /apps/{appId}/{collection} {
       allow list: if request.auth != null;
     }
