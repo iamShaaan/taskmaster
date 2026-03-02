@@ -15,6 +15,9 @@ import { useAppStore } from './store';
 import type { Task, Meeting, Client, Project, Note } from './types';
 import { Sparkles } from 'lucide-react';
 
+import { ClientDetail } from './pages/ClientDetail';
+import { ProjectDetail } from './pages/ProjectDetail';
+
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
 
@@ -48,7 +51,15 @@ const DataLoader: React.FC = () => {
     }));
 
     unsubs.push(listenCollection('projects', (data) => {
-      setProjects(data.map((d) => ({ ...d, created_at: toDate(d.created_at as never) || new Date() } as unknown as Project)));
+      setProjects(data.map((d) => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date(),
+        time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
+          start: toDate(l.start as never) || new Date(),
+          end: toDate(l.end as never) || new Date(),
+          duration_ms: l.duration_ms as number,
+        })),
+      } as unknown as Project)));
     }));
 
     unsubs.push(listenCollection('notes', (data) => {
@@ -98,7 +109,9 @@ function App() {
           <Route path="tasks" element={<Tasks />} />
           <Route path="meetings" element={<Meetings />} />
           <Route path="clients" element={<Clients />} />
+          <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="projects" element={<Projects />} />
+          <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="notes" element={<Notes />} />
           <Route path="files" element={<Files />} />
         </Route>

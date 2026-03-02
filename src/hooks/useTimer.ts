@@ -2,9 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAppStore } from '../store';
 import { updateDocById } from '../firebase/firestore';
 
-export const useTimer = (taskId: string, currentTimeLogs: { start: Date; end: Date; duration_ms: number }[]) => {
+export const useTimer = (
+    entityId: string,
+    currentTimeLogs: { start: Date; end: Date; duration_ms: number }[],
+    collectionName: 'tasks' | 'projects' = 'tasks'
+) => {
     const { activeTimerId, timerStartTime, setActiveTimer } = useAppStore();
-    const isRunning = activeTimerId === taskId;
+    const isRunning = activeTimerId === entityId;
     const [elapsed, setElapsed] = useState(0);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -22,8 +26,8 @@ export const useTimer = (taskId: string, currentTimeLogs: { start: Date; end: Da
 
     const start = useCallback(() => {
         if (isRunning) return;
-        setActiveTimer(taskId, new Date());
-    }, [isRunning, taskId, setActiveTimer]);
+        setActiveTimer(entityId, new Date());
+    }, [isRunning, entityId, setActiveTimer]);
 
     const stop = useCallback(async () => {
         if (!isRunning || !timerStartTime) return;
@@ -34,7 +38,7 @@ export const useTimer = (taskId: string, currentTimeLogs: { start: Date; end: Da
         const totalMs = updatedLogs.reduce((acc, l) => acc + l.duration_ms, 0);
         setActiveTimer(null, null);
 
-        await updateDocById('tasks', taskId, {
+        await updateDocById(collectionName, entityId, {
             time_logs: updatedLogs.map((l) => ({
                 start: l.start,
                 end: l.end,
@@ -42,7 +46,7 @@ export const useTimer = (taskId: string, currentTimeLogs: { start: Date; end: Da
             })),
             total_time_ms: totalMs,
         });
-    }, [isRunning, timerStartTime, currentTimeLogs, taskId, setActiveTimer]);
+    }, [isRunning, timerStartTime, currentTimeLogs, entityId, setActiveTimer, collectionName]);
 
     return { isRunning, elapsed, start, stop };
 };

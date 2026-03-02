@@ -58,6 +58,8 @@ export interface Project {
     files: FileAttachment[];
     created_at: Date;
     color: string;
+    time_logs?: TimeLog[];
+    total_time_ms?: number;
 }
 
 export interface Note {

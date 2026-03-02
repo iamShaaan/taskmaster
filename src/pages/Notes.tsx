@@ -8,7 +8,7 @@ import { deleteDocById } from '../firebase/firestore';
 import { formatDate } from '../utils/timeFormat';
 import toast from 'react-hot-toast';
 
-const VAULT_PIN = '2025'; // Simple demo PIN — stored client-side only
+const VAULT_PIN = '1949'; // Simple demo PIN — stored client-side only
 
 export const Notes: React.FC = () => {
     const { notes } = useAppStore();

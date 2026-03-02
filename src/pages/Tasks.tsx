@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, Search, LayoutGrid, List } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { TaskForm } from '../components/tasks/TaskForm';
 import { Modal } from '../components/ui/Modal';
 import type { Task } from '../types';
+import { updateDocById } from '../firebase/firestore';
+import toast from 'react-hot-toast';
 
 const STATUS_COLUMNS = [
     { key: 'open', label: 'Open', color: 'border-slate-600' },
@@ -32,6 +35,23 @@ export const Tasks: React.FC = () => {
 
     const openEdit = (task: Task) => { setEditTask(task); setShowForm(true); };
     const closeForm = () => { setEditTask(undefined); setShowForm(false); };
+
+    const onDragEnd = async (result: DropResult) => {
+        const { destination, source, draggableId } = result;
+
+        if (!destination) return;
+        if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+        const newStatus = destination.droppableId as Task['status'];
+
+        try {
+            await updateDocById('tasks', draggableId, { status: newStatus });
+            toast.success(`Task moved to ${newStatus}`);
+        } catch (error) {
+            toast.error('Failed to move task');
+            console.error(error);
+        }
+    };
 
     return (
         <div className="h-full flex flex-col gap-6">
@@ -88,51 +108,72 @@ export const Tasks: React.FC = () => {
 
             {/* Kanban View */}
             {view === 'kanban' && (
-                <div className="flex-1 flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-                    {STATUS_COLUMNS.map(({ key, label, color }, idx) => {
-                        const colTasks = filtered.filter((t) => t.status === key);
-                        return (
-                            <motion.div
-                                key={key}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.1 }}
-                                className="flex flex-col gap-4 min-w-[320px] max-w-[320px]"
-                            >
-                                <div className={`flex items-center justify-between p-3 rounded-t-xl bg-slate-800/30 border-b-2 ${color.replace('border-', 'border-b-').replace('600', '400')}`}>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${color.replace('border-', 'bg-')}`} />
-                                        <span className="text-slate-200 text-sm font-bold uppercase tracking-wider">{label}</span>
+                <DragDropContext onDragEnd={onDragEnd}>
+                    <div className="flex-1 flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                        {STATUS_COLUMNS.map(({ key, label, color }, idx) => {
+                            const colTasks = filtered.filter((t) => t.status === key);
+                            return (
+                                <motion.div
+                                    key={key}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: idx * 0.1 }}
+                                    className="flex flex-col gap-4 min-w-[320px] max-w-[320px]"
+                                >
+                                    <div className={`flex items-center justify-between p-3 rounded-t-xl bg-slate-800/30 border-b-2 ${color.replace('border-', 'border-b-').replace('600', '400')}`}>
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${color.replace('border-', 'bg-')}`} />
+                                            <span className="text-slate-200 text-sm font-bold uppercase tracking-wider">{label}</span>
+                                        </div>
+                                        <span className="text-[10px] font-black bg-slate-900/80 text-slate-400 px-2 py-0.5 rounded-md border border-white/5">
+                                            {colTasks.length}
+                                        </span>
                                     </div>
-                                    <span className="text-[10px] font-black bg-slate-900/80 text-slate-400 px-2 py-0.5 rounded-md border border-white/5">
-                                        {colTasks.length}
-                                    </span>
-                                </div>
 
-                                <div className="flex flex-col gap-4 flex-1 overflow-y-auto max-h-[calc(100vh-320px)] pr-2 custom-scrollbar">
-                                    <AnimatePresence mode="popLayout">
-                                        {colTasks.map((task) => (
-                                            <TaskCard key={task.id} task={task} onEdit={openEdit} />
-                                        ))}
-                                    </AnimatePresence>
+                                    <Droppable droppableId={key}>
+                                        {(provided) => (
+                                            <div
+                                                {...provided.droppableProps}
+                                                ref={provided.innerRef}
+                                                className="flex flex-col gap-4 flex-1 overflow-y-auto max-h-[calc(100vh-320px)] pr-2 custom-scrollbar min-h-[150px]"
+                                            >
+                                                <AnimatePresence mode="popLayout">
+                                                    {colTasks.map((task, index) => (
+                                                        <Draggable key={task.id} draggableId={task.id} index={index}>
+                                                            {(draggableProvided) => (
+                                                                <div
+                                                                    ref={draggableProvided.innerRef}
+                                                                    {...draggableProvided.draggableProps}
+                                                                    {...draggableProvided.dragHandleProps}
+                                                                >
+                                                                    <TaskCard task={task} onEdit={openEdit} />
+                                                                </div>
+                                                            )}
+                                                        </Draggable>
+                                                    ))}
+                                                </AnimatePresence>
+                                                {provided.placeholder}
 
-                                    {colTasks.length === 0 && (
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="flex flex-col items-center justify-center py-12 px-4 text-center border-2 border-dashed border-slate-700/30 rounded-2xl bg-slate-800/10"
-                                        >
-                                            <div className="w-12 h-12 rounded-full bg-slate-800/50 flex items-center justify-center mb-3 text-slate-600">
-                                                <Plus size={24} />
+                                                {colTasks.length === 0 && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        className="flex flex-col items-center justify-center py-12 px-4 text-center border-2 border-dashed border-slate-700/30 rounded-2xl bg-slate-800/10"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-full bg-slate-800/50 flex items-center justify-center mb-3 text-slate-600">
+                                                            <Plus size={24} />
+                                                        </div>
+                                                        <p className="text-slate-500 text-xs font-medium italic">Drop tasks here or create new</p>
+                                                    </motion.div>
+                                                )}
                                             </div>
-                                            <p className="text-slate-500 text-xs font-medium italic">Drop tasks here or create new</p>
-                                        </motion.div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </div>
+                                        )}
+                                    </Droppable>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                </DragDropContext>
             )}
 
             {/* List View */}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Phone, Mail, Building2, Pencil, Trash2, FileArchive, ChevronDown, ChevronUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Phone, Mail, Building2, Pencil, Trash2, FileArchive, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../store';
 import { ClientForm } from '../components/clients/ClientForm';
 import { Modal } from '../components/ui/Modal';
@@ -8,6 +9,7 @@ import { deleteDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
 
 export const Clients: React.FC = () => {
+    const navigate = useNavigate();
     const { clients } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editClient, setEditClient] = useState<Client | undefined>();
@@ -52,7 +54,12 @@ export const Clients: React.FC = () => {
                                     {client.name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-slate-100 font-medium">{client.name}</h3>
+                                    <h3
+                                        className="text-slate-100 font-medium hover:text-indigo-400 cursor-pointer transition-colors"
+                                        onClick={() => navigate(`/clients/${client.id}`)}
+                                    >
+                                        {client.name}
+                                    </h3>
                                     {client.company && <p className="text-slate-400 text-sm flex items-center gap-1"><Building2 size={12} />{client.company}</p>}
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -66,8 +73,21 @@ export const Clients: React.FC = () => {
                                             <Mail size={10} />{client.emails.length}
                                         </span>
                                     )}
-                                    <button onClick={() => { setEditClient(client); setShowForm(true); }} className="p-1.5 ml-2 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"><Pencil size={14} /></button>
-                                    <button onClick={() => handleDelete(client.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={14} /></button>
+                                    <div className="flex items-center gap-1 ml-2">
+                                        <button
+                                            onClick={() => navigate(`/clients/${client.id}`)}
+                                            className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-lg transition-all"
+                                            title="View Details"
+                                        >
+                                            <ExternalLink size={16} />
+                                        </button>
+                                        <button onClick={() => { setEditClient(client); setShowForm(true); }} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-lg transition-all">
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(client.id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700/50 rounded-lg transition-all">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                     <button onClick={() => setExpanded(expanded === client.id ? null : client.id)} className="p-1.5 text-slate-500 hover:text-slate-300 rounded-lg transition-all">
                                         {expanded === client.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                     </button>

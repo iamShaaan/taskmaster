@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, FolderKanban, Pencil, Trash2, CheckSquare, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, FolderKanban, Pencil, Trash2, CheckSquare, Calendar, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../store';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import { Modal } from '../components/ui/Modal';
@@ -9,6 +10,7 @@ import { statusBadge } from '../components/ui/Badge';
 import toast from 'react-hot-toast';
 
 export const Projects: React.FC = () => {
+    const navigate = useNavigate();
     const { projects, tasks, meetings } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editProject, setEditProject] = useState<Project | undefined>();
@@ -43,14 +45,30 @@ export const Projects: React.FC = () => {
 
                         return (
                             <div key={project.id} className="group bg-slate-800 border border-slate-700/50 rounded-xl p-5 hover:border-indigo-500/40 transition-all">
-                                <div className="flex items-start justify-between gap-2 mb-3">
-                                    <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
-                                        <h3 className="text-slate-100 font-semibold">{project.name}</h3>
+                                        <h3
+                                            className="text-slate-100 font-bold hover:text-indigo-400 cursor-pointer transition-colors"
+                                            onClick={() => navigate(`/projects/${project.id}`)}
+                                        >
+                                            {project.name}
+                                        </h3>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => { setEditProject(project); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"><Pencil size={13} /></button>
-                                        <button onClick={() => handleDelete(project.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
+                                    <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                                        <button
+                                            onClick={() => navigate(`/projects/${project.id}`)}
+                                            className="p-1.5 text-slate-400 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"
+                                            title="View Details"
+                                        >
+                                            <ExternalLink size={14} />
+                                        </button>
+                                        <button onClick={() => { setEditProject(project); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all">
+                                            <Pencil size={13} />
+                                        </button>
+                                        <button onClick={() => handleDelete(project.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all">
+                                            <Trash2 size={13} />
+                                        </button>
                                     </div>
                                 </div>
 
@@ -80,7 +98,7 @@ export const Projects: React.FC = () => {
                                         <Calendar size={12} />
                                         <span>{projectMeetings.length} meeting{projectMeetings.length !== 1 ? 's' : ''}</span>
                                     </div>
-                                    {project.files?.length > 0 && (
+                                    {project.files && project.files.length > 0 && (
                                         <div className="text-xs text-slate-500">{project.files.length} file{project.files.length !== 1 ? 's' : ''}</div>
                                     )}
                                 </div>
