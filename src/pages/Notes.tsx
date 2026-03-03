@@ -262,6 +262,7 @@ export const Notes: React.FC = () => {
     const { notes } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editNote, setEditNote] = useState<Note | undefined>();
+    const [viewNote, setViewNote] = useState<Note | undefined>();
     const [search, setSearch] = useState('');
     const [vaultUnlocked, setVaultUnlocked] = useState(false);
     const [revealedNotes, setRevealedNotes] = useState<string[]>([]);
@@ -342,7 +343,10 @@ export const Notes: React.FC = () => {
     const NoteCard = ({ note }: { note: Note }) => {
         const isRevealed = !note.is_secure || revealedNotes.includes(note.id);
         return (
-            <div className={`group bg-slate-800 border rounded-xl p-4 hover:border-indigo-500/30 transition-all ${note.is_secure ? 'border-amber-500/30' : 'border-slate-700/50'}`}>
+            <div
+                onClick={() => isRevealed && setViewNote(note)}
+                className={`group bg-slate-800 border rounded-xl p-4 hover:border-indigo-500/30 transition-all ${isRevealed ? 'cursor-pointer' : ''} ${note.is_secure ? 'border-amber-500/30' : 'border-slate-700/50'}`}
+            >
                 <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                         {note.is_secure && <Lock size={13} className="text-amber-400 flex-shrink-0" />}
@@ -350,12 +354,12 @@ export const Notes: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {note.is_secure && (
-                            <button onClick={() => toggleReveal(note.id)} className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg transition-all">
+                            <button onClick={(e) => { e.stopPropagation(); toggleReveal(note.id); }} className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg transition-all">
                                 {isRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
                             </button>
                         )}
-                        <button onClick={() => { setEditNote(note); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"><Pencil size={13} /></button>
-                        <button onClick={() => handleDelete(note.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setEditNote(note); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"><Pencil size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(note.id); }} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
                     </div>
                 </div>
                 <div className={`text-slate-400 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-32 overflow-hidden ${!isRevealed ? 'blur-sm select-none' : ''}`}>
@@ -428,6 +432,38 @@ export const Notes: React.FC = () => {
 
             <Modal isOpen={showForm} onClose={() => { setEditNote(undefined); setShowForm(false); }} title={editNote ? 'Edit Note' : 'New Note'} size="lg">
                 <NoteEditor onClose={() => { setEditNote(undefined); setShowForm(false); }} editNote={editNote} />
+            </Modal>
+
+            {/* Note View Modal */}
+            <Modal isOpen={!!viewNote} onClose={() => setViewNote(undefined)} title={viewNote?.title || 'Note Details'} size="lg">
+                {viewNote && (
+                    <div className="space-y-4">
+                        <div className="bg-slate-900/50 rounded-xl p-4 max-h-[60vh] overflow-y-auto custom-scrollbar border border-slate-700/50">
+                            <pre className="text-slate-300 text-sm font-mono whitespace-pre-wrap font-sans leading-relaxed">
+                                {viewNote.content || <span className="text-slate-500 italic">Empty note</span>}
+                            </pre>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-slate-700/50 pt-4">
+                            <div className="flex flex-wrap gap-2">
+                                {viewNote.tags?.map((t) => (
+                                    <span key={t} className="text-xs text-slate-400 bg-slate-800 border border-slate-700 px-2 py-1 rounded-md flex items-center gap-1">
+                                        <Tag size={10} /> {t}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-slate-500">Updated: {formatDate(viewNote.updated_at)}</span>
+                                <button
+                                    onClick={() => { setEditNote(viewNote); setViewNote(undefined); setShowForm(true); }}
+                                    className="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-lg text-sm transition-colors flex items-center gap-1.5"
+                                >
+                                    <Pencil size={14} /> Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );
