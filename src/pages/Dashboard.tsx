@@ -20,7 +20,7 @@ const StatCard = ({
         <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-5 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all cursor-pointer group"
+            className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 sm:p-5 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all cursor-pointer group flex flex-col h-full justify-between"
         >
             <div className="flex items-center justify-between mb-4">
                 <div className={`p-2.5 rounded-xl ${color}`}><Icon size={18} /></div>
@@ -29,9 +29,9 @@ const StatCard = ({
             {loading ? (
                 <Loader2 size={20} className="animate-spin text-slate-600 mb-1" />
             ) : (
-                <p className="text-3xl font-black text-slate-100 tracking-tight">{value}</p>
+                <p className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">{value}</p>
             )}
-            <p className="text-slate-400 text-sm mt-1 font-medium">{label}</p>
+            <p className="text-slate-400 text-xs sm:text-sm mt-1 font-medium">{label}</p>
             {sub && <p className="text-slate-600 text-xs mt-0.5">{sub}</p>}
         </motion.div>
     </Link>
@@ -85,7 +85,7 @@ export const Dashboard: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* ── Stat Cards ───────────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <StatCard
                     icon={CheckSquare} label="Open Tasks" to="/tasks"
                     value={openTasks.length}
@@ -116,24 +116,24 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* ── Progress + Priority Bars ──────────────────────────────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 {/* Time tracked */}
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5">
+                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 sm:p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <Timer size={15} className="text-emerald-400" />
-                        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Time Tracked</span>
+                        <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Time Tracked</span>
                     </div>
-                    <p className="text-2xl font-black text-emerald-400 mt-2 tracking-tight">{formatDuration(totalTrackedMs)}</p>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-2 tracking-tight">{formatDuration(totalTrackedMs)}</p>
                     <p className="text-slate-600 text-xs mt-1">across all tasks</p>
                 </div>
 
                 {/* Completion rate */}
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5">
+                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 sm:p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingUp size={15} className="text-indigo-400" />
-                        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Completion Rate</span>
+                        <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Completion Rate</span>
                     </div>
-                    <p className="text-2xl font-black text-indigo-400 mt-2 tracking-tight">{completionRate}%</p>
+                    <p className="text-xl sm:text-2xl font-black text-indigo-400 mt-2 tracking-tight">{completionRate}%</p>
                     <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                         <motion.div
                             className="h-full bg-indigo-500 rounded-full"
@@ -145,12 +145,12 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {/* High priority alerts */}
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5">
+                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 sm:p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <Flame size={15} className={highPriorityOpen.length > 0 ? 'text-red-400' : 'text-slate-500'} />
-                        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">High Priority</span>
+                        <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">High Priority</span>
                     </div>
-                    <p className={`text-2xl font-black mt-2 tracking-tight ${highPriorityOpen.length > 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                    <p className={`text-xl sm:text-2xl font-black mt-2 tracking-tight ${highPriorityOpen.length > 0 ? 'text-red-400' : 'text-slate-500'}`}>
                         {highPriorityOpen.length}
                     </p>
                     <p className="text-slate-600 text-xs mt-1">
@@ -160,9 +160,9 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* ── Main Content Grid ────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Recent Tasks */}
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5">
+                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 sm:p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-slate-100 font-bold">Recent Tasks</h2>
                         <Link to="/tasks" className="text-indigo-400 text-xs hover:text-indigo-300 transition-colors flex items-center gap-1">
@@ -191,8 +191,8 @@ export const Dashboard: React.FC = () => {
                                     <div className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-slate-700/40 transition-all group">
                                         <div className="min-w-0 flex-1 flex items-center gap-3">
                                             <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${task.status === 'done' ? 'bg-emerald-400' :
-                                                    task.status === 'in_progress' ? 'bg-indigo-400' :
-                                                        task.priority === 'high' ? 'bg-red-400' : 'bg-slate-500'
+                                                task.status === 'in_progress' ? 'bg-indigo-400' :
+                                                    task.priority === 'high' ? 'bg-red-400' : 'bg-slate-500'
                                                 }`} />
                                             <div className="min-w-0">
                                                 <p className={`text-sm truncate font-medium ${task.status === 'done' ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
@@ -217,7 +217,7 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Upcoming Meetings */}
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5">
+                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 sm:p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-slate-100 font-bold">Upcoming Meetings</h2>
                         <Link to="/meetings" className="text-indigo-400 text-xs hover:text-indigo-300 transition-colors flex items-center gap-1">

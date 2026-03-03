@@ -70,7 +70,7 @@ export const Tasks: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 flex-wrap bg-slate-800/40 p-3 rounded-2xl border border-white/5 backdrop-blur-md"
             >
-                <div className="relative flex-1 min-w-[300px]">
+                <div className="relative flex-1 min-w-full sm:min-w-[300px]">
                     <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         className="w-full bg-slate-900/50 border border-slate-700/50 text-slate-100 rounded-xl pl-11 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all placeholder:text-slate-500"
@@ -127,7 +127,7 @@ export const Tasks: React.FC = () => {
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: idx * 0.1 }}
-                                    className="flex flex-col gap-4 min-w-[320px] max-w-[320px]"
+                                    className="flex flex-col gap-4 min-w-[280px] sm:min-w-[320px] max-w-[280px] sm:max-w-[320px]"
                                 >
                                     <div className={`flex items-center justify-between p-3 rounded-t-xl bg-slate-800/30 border-b-2 ${color.replace('border-', 'border-b-').replace('600', '400')}`}>
                                         <div className="flex items-center gap-2">

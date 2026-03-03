@@ -106,7 +106,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
             </div>
 
             {/* Type / Priority / Status */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                     <label className={labelCls}>Type</label>
                     <select className={inputCls} value={form.type} onChange={(e) => set('type', e.target.value)}>
@@ -135,7 +135,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
             </div>
 
             {/* Client + Project — always visible, project filtered by client */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label className={labelCls}>
                         <span className="flex items-center gap-1"><Users size={11} /> Client</span>

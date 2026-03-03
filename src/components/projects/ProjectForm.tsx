@@ -59,7 +59,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
                 <label className={labelCls}>Description</label>
                 <textarea className={`${inputCls} resize-none`} rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label className={labelCls}>Status</label>
                     <select className={inputCls} value={form.status} onChange={(e) => set('status', e.target.value)}>

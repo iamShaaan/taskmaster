@@ -76,8 +76,8 @@ export const Files: React.FC = () => {
                     <p className="text-slate-400">No files yet. Upload files from Tasks, Clients, or Projects.</p>
                 </div>
             ) : (
-                <div className="bg-slate-800 border border-slate-700/50 rounded-xl overflow-hidden">
-                    <table className="w-full">
+                <div className="bg-slate-800 border border-slate-700/50 rounded-xl overflow-x-auto">
+                    <table className="w-full min-w-[600px]">
                         <thead>
                             <tr className="border-b border-slate-700/50">
                                 <th className="text-slate-500 text-xs font-medium text-left px-4 py-3">File</th>

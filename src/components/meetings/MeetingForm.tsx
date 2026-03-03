@@ -99,7 +99,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({ onClose, editMeeting }
                 <label className={labelCls}>Description</label>
                 <textarea className={`${inputCls} resize-none`} rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label className={labelCls}>Start Time *</label>
                     <input type="datetime-local" className={inputCls} value={form.start_time} onChange={(e) => { set('start_time', e.target.value); checkConflicts(e.target.value, form.end_time); }} />
@@ -142,7 +142,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({ onClose, editMeeting }
             </div>
 
             {/* Links */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                     <label className={labelCls}>Link Task</label>
                     <select className={inputCls} value={form.linked_task_id} onChange={(e) => set('linked_task_id', e.target.value)}>

@@ -78,7 +78,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({ onClose, editClient }) =
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label className={labelCls}>Full Name *</label>
                     <input className={inputCls} placeholder="John Doe" value={form.name} onChange={(e) => set('name', e.target.value)} />

@@ -121,7 +121,7 @@ const VaultLockScreen: React.FC<{
     };
 
     return (
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/20 rounded-2xl p-10 text-center max-w-sm mx-auto shadow-2xl shadow-amber-500/5 relative overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/20 rounded-2xl p-6 sm:p-10 text-center max-w-sm w-full mx-auto shadow-2xl shadow-amber-500/5 relative overflow-hidden">
             <div className="absolute inset-0 bg-amber-500/3 pointer-events-none rounded-2xl" />
 
             <div className="relative z-10">
