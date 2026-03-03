@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useAppStore } from '../store';
 import { updateDocById } from '../firebase/firestore';
+import { db, APP_ID } from '../firebase/config';
 
 export const useTimer = (
     entityId: string,
     currentTimeLogs: { start: Date; end: Date; duration_ms: number }[],
-    collectionName: 'tasks' | 'projects' = 'tasks'
+    collectionName: 'tasks' | 'projects' = 'tasks',
+    projectId?: string,
+    taskTitle?: string
 ) => {
     const { activeTimerId, timerStartTime, setActiveTimer } = useAppStore();
     const isRunning = activeTimerId === entityId;
@@ -38,6 +43,7 @@ export const useTimer = (
         const totalMs = updatedLogs.reduce((acc, l) => acc + l.duration_ms, 0);
         setActiveTimer(null, null);
 
+        // Save time_logs on the task
         await updateDocById(collectionName, entityId, {
             time_logs: updatedLogs.map((l) => ({
                 start: l.start,
@@ -46,7 +52,22 @@ export const useTimer = (
             })),
             total_time_ms: totalMs,
         });
-    }, [isRunning, timerStartTime, currentTimeLogs, entityId, setActiveTimer, collectionName]);
+
+        // If this task belongs to a project, append a time entry to the project doc
+        if (projectId && collectionName === 'tasks') {
+            const dateStr = timerStartTime.toISOString().split('T')[0];
+            const newEntry = {
+                task_id: entityId,
+                task_title: taskTitle || 'Task',
+                date: dateStr,
+                start: timerStartTime,
+                end: endTime,
+                duration_ms,
+            };
+            const ref = doc(db, `apps/${APP_ID}/projects`, projectId);
+            await updateDoc(ref, { time_entries: arrayUnion(newEntry) });
+        }
+    }, [isRunning, timerStartTime, currentTimeLogs, entityId, setActiveTimer, collectionName, projectId, taskTitle]);
 
     return { isRunning, elapsed, start, stop };
 };

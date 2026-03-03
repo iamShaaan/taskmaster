@@ -2,18 +2,115 @@ import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FolderKanban, CheckSquare, Calendar,
-    FileArchive, Play, Square, Timer, Upload, ExternalLink, Users, Download, Trash2
+    FileArchive, Timer, Upload, ExternalLink, Users, Download, Trash2, Clock
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { statusBadge } from '../components/ui/Badge';
 import { formatDate, formatDuration } from '../utils/timeFormat';
-import { useTimer } from '../hooks/useTimer';
 import { useDropzone } from 'react-dropzone';
 import { auth } from '../firebase/config';
 import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
+import type { Project, ProjectTimeEntry } from '../types';
+
+// ─── Time Records Section ──────────────────────────────────────────────────────
+
+const ProjectTimeLogs: React.FC<{ project: Project; tasks: any[] }> = ({ project, tasks }) => {
+    // Derive time entries: combine project-level time_entries (from stopped task timers)
+    // PLUS live task time_logs (for tasks already stored in Firestore)
+    const taskEntries = tasks.flatMap((t) =>
+        (t.time_logs || []).map((log: any) => ({
+            task_id: t.id,
+            task_title: t.title,
+            date: new Date(log.start instanceof Date ? log.start : log.start?.toDate?.() ?? log.start)
+                .toISOString().split('T')[0],
+            start: log.start,
+            end: log.end,
+            duration_ms: log.duration_ms,
+        }))
+    );
+
+    // Also include any project-level time_entries (written by useTimer on stop)
+    const projectEntries: ProjectTimeEntry[] = project.time_entries || [];
+
+    // Merge — deduplicate by task_id + date + duration_ms
+    const seen = new Set<string>();
+    const all = [...taskEntries, ...projectEntries].filter((e) => {
+        const key = `${e.task_id}-${e.date}-${e.duration_ms}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    // Sort newest first
+    all.sort((a, b) => {
+        const aTime = a.start instanceof Date ? a.start.getTime() : new Date(a.start as any).getTime();
+        const bTime = b.start instanceof Date ? b.start.getTime() : new Date(b.start as any).getTime();
+        return bTime - aTime;
+    });
+
+    const totalMs = all.reduce((sum, e) => sum + e.duration_ms, 0);
+
+    if (all.length === 0) {
+        return (
+            <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6">
+                <h2 className="text-slate-100 font-bold mb-4 flex items-center gap-2">
+                    <Clock size={18} className="text-amber-400" /> Time Records
+                </h2>
+                <p className="text-slate-600 text-sm italic text-center py-8 border-2 border-dashed border-slate-800 rounded-xl">
+                    No time logged yet. Start a task timer to record time against this project.
+                </p>
+            </section>
+        );
+    }
+
+    return (
+        <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6">
+            <h2 className="text-slate-100 font-bold mb-1 flex items-center gap-2">
+                <Clock size={18} className="text-amber-400" /> Time Records
+            </h2>
+            <p className="text-slate-500 text-xs mb-5">
+                Total logged: <span className="text-amber-400 font-mono font-bold">{formatDuration(totalMs)}</span>
+            </p>
+
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 mb-2">
+                <span>Task</span>
+                <span className="text-right">Date</span>
+                <span className="text-right">Duration</span>
+            </div>
+
+            <div className="space-y-1.5">
+                {all.map((entry, idx) => {
+                    const dateLabel = new Date(entry.date).toLocaleDateString('en-GB', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                    });
+                    return (
+                        <div
+                            key={idx}
+                            className="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-3 py-2.5 bg-slate-900/50 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all group"
+                        >
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 flex-shrink-0" />
+                                <span className="text-slate-200 text-xs font-medium truncate group-hover:text-amber-300 transition-colors">
+                                    {entry.task_title}
+                                </span>
+                            </div>
+                            <span className="text-slate-500 text-xs text-right whitespace-nowrap">{dateLabel}</span>
+                            <span className="text-amber-400 text-xs font-mono font-bold text-right whitespace-nowrap">
+                                {formatDuration(entry.duration_ms)}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
+    );
+};
+
+// ─── Main ProjectDetail ────────────────────────────────────────────────────────
 
 export const ProjectDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -25,26 +122,17 @@ export const ProjectDetail: React.FC = () => {
     const client = clients.find((c) => c.id === project?.client_id);
     const isOwner = auth.currentUser?.uid === project?.owner_id;
 
-    const { isRunning, elapsed, start, stop } = useTimer(
-        project?.id || '',
-        project?.time_logs || [],
-        'projects'
-    );
-
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         if (!project) return;
-
         if (!auth.currentUser) {
-            toast.error('Upload Failed: You must be authenticated. Enable "Anonymous Auth" in Firebase Console.');
+            toast.error('Upload Failed: You must be authenticated.');
             return;
         }
-
         setUploading(true);
         try {
             const uploadedUrls = await Promise.all(
                 acceptedFiles.map(file => uploadFile(file, 'projects', project.id))
             );
-
             const newFiles = [...(project.files || []), ...uploadedUrls.map(f => ({
                 id: Math.random().toString(36).substr(2, 9),
                 ...f,
@@ -52,7 +140,6 @@ export const ProjectDetail: React.FC = () => {
                 entity_type: 'project' as const,
                 entity_id: project.id
             }))];
-
             await updateDocById('projects', project.id, { files: newFiles });
             toast.success('Files uploaded successfully');
         } catch (error) {
@@ -67,8 +154,7 @@ export const ProjectDetail: React.FC = () => {
         if (!project) return;
         if (!window.confirm('Delete this file? This cannot be undone.')) return;
         try {
-            const storageRef = fileUrl;
-            await deleteFile(storageRef);
+            await deleteFile(fileUrl);
             const updatedFiles = (project.files || []).filter(f => f.id !== fileId);
             await updateDocById('projects', project.id, { files: updatedFiles });
             toast.success('File deleted');
@@ -92,7 +178,9 @@ export const ProjectDetail: React.FC = () => {
 
     const projectTasks = tasks.filter((t) => t.project_id === id);
     const projectMeetings = meetings.filter((m) => m.linked_project_id === id);
-    const totalMs = (project.total_time_ms || 0) + (isRunning ? elapsed : 0);
+
+    // Total time = sum of all task total_time_ms for this project
+    const totalMs = projectTasks.reduce((sum, t) => sum + (t.total_time_ms || 0), 0);
 
     return (
         <div className="space-y-8 pb-12">
@@ -125,30 +213,17 @@ export const ProjectDetail: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4 bg-slate-900/50 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-                    <div className="flex items-center gap-3 pr-4 border-r border-slate-700/50">
-                        <div className={`p-2 rounded-xl ${isRunning ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                            <Timer size={20} className={isRunning ? 'animate-spin-slow' : ''} />
-                        </div>
-                        <div className="text-left">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Project Timer</p>
-                            <span className={`text-xl font-mono font-bold ${isRunning ? 'text-emerald-400' : 'text-slate-300'}`}>
-                                {formatDuration(totalMs)}
-                            </span>
-                        </div>
+                {/* Total Time Display — read-only */}
+                <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                        <Timer size={20} />
                     </div>
-                    {isOwner && (
-                        <button
-                            onClick={isRunning ? stop : start}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95 ${isRunning
-                                ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
-                                : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-500/20'
-                                }`}
-                        >
-                            {isRunning ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                            {isRunning ? 'STOP' : 'START'}
-                        </button>
-                    )}
+                    <div className="text-left">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Time Logged</p>
+                        <span className={`text-xl font-mono font-bold ${totalMs > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+                            {totalMs > 0 ? formatDuration(totalMs) : '00:00:00'}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -185,12 +260,10 @@ export const ProjectDetail: React.FC = () => {
                             <span className="text-xs font-normal text-slate-500">{project.files?.length || 0} items</span>
                         </h2>
 
-                        {/* Dropzone — owner only */}
                         {isOwner && (
                             <div
                                 {...getRootProps()}
-                                className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all mb-4 ${isDragActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-slate-500'
-                                    }`}
+                                className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all mb-4 ${isDragActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-slate-500'}`}
                             >
                                 <input {...getInputProps()} />
                                 <Upload size={24} className="mx-auto mb-2 text-slate-500" />
@@ -208,27 +281,14 @@ export const ProjectDetail: React.FC = () => {
                                         <span className="text-slate-300 text-xs truncate max-w-[120px]">{f.name}</span>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
-                                        {/* Download — visible to all */}
-                                        <a
-                                            href={f.url}
-                                            download={f.name}
-                                            title="Download file"
-                                            className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
-                                            onClick={e => e.stopPropagation()}
-                                        >
+                                        <a href={f.url} download={f.name} title="Download file" className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors" onClick={e => e.stopPropagation()}>
                                             <Download size={14} />
                                         </a>
-                                        {/* External link */}
                                         <a href={f.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
                                             <ExternalLink size={14} />
                                         </a>
-                                        {/* Delete — owner only */}
                                         {isOwner && (
-                                            <button
-                                                onClick={() => handleDeleteFile(f.id, f.url)}
-                                                title="Delete file"
-                                                className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
-                                            >
+                                            <button onClick={() => handleDeleteFile(f.id, f.url)} title="Delete file" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
                                                 <Trash2 size={14} />
                                             </button>
                                         )}
@@ -242,7 +302,7 @@ export const ProjectDetail: React.FC = () => {
                     </section>
                 </div>
 
-                {/* Tasks & Meetings */}
+                {/* Tasks, Time Records & Meetings */}
                 <div className="lg:col-span-2 space-y-8">
                     {/* Tasks */}
                     <section>
@@ -251,7 +311,7 @@ export const ProjectDetail: React.FC = () => {
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {projectTasks.map(t => (
-                                <TaskCard key={t.id} task={t} onEdit={() => { }} compact />
+                                <TaskCard key={t.id} task={t} onEdit={() => { }} compact={false} />
                             ))}
                             {projectTasks.length === 0 && (
                                 <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl text-slate-600 italic">
@@ -260,6 +320,9 @@ export const ProjectDetail: React.FC = () => {
                             )}
                         </div>
                     </section>
+
+                    {/* Time Records */}
+                    <ProjectTimeLogs project={project} tasks={projectTasks} />
 
                     {/* Meetings */}
                     <section>
@@ -314,51 +377,24 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
 
     const handleAddMember = async () => {
         if (!userCode.trim()) { toast.error('Enter a User Code'); return; }
-
         setAdding(true);
         try {
             const { searchByUserCode, updateDocById: update } = await import('../firebase/firestore');
             const results = await searchByUserCode(userCode.trim());
-
-            if (results.length === 0) {
-                toast.error('No user found with that code. Ask them to check their Profile page.');
-                return;
-            }
-
+            if (results.length === 0) { toast.error('No user found with that code.'); return; }
             const found = results[0];
             const targetUid: string = found.uid || found.id;
-
-            // Prevent duplicate
             if (targetUid === project.owner_id) { toast.error('That user is already the project owner'); return; }
             const existing: string[] = project.member_uids || project.shared_with || [];
             if (existing.includes(targetUid)) { toast.error('This user is already a team member'); return; }
-
-            // Build updated arrays
-            const newMember = {
-                uid: targetUid,
-                email: emailLabel.trim() || found.email || found.personalEmail || '',
-                role,
-                added_at: new Date(),
-            };
+            const newMember = { uid: targetUid, email: emailLabel.trim() || found.email || '', role, added_at: new Date() };
             const updatedMembers = [...(project.members || []), newMember];
             const updatedMemberUids = [...existing, targetUid];
-            const updatedAdminUids = role === 'admin'
-                ? [...(project.admin_uids || []), targetUid] : (project.admin_uids || []);
-            const updatedModeratorUids = role === 'moderator'
-                ? [...(project.moderator_uids || []), targetUid] : (project.moderator_uids || []);
-            const updatedViewerUids = role === 'viewer'
-                ? [...(project.viewer_uids || []), targetUid] : (project.viewer_uids || []);
-
-            await update('projects', project.id, {
-                members: updatedMembers,
-                member_uids: updatedMemberUids,
-                admin_uids: updatedAdminUids,
-                moderator_uids: updatedModeratorUids,
-                viewer_uids: updatedViewerUids,
-            });
-
-            setEmailLabel('');
-            setUserCode('');
+            const updatedAdminUids = role === 'admin' ? [...(project.admin_uids || []), targetUid] : (project.admin_uids || []);
+            const updatedModeratorUids = role === 'moderator' ? [...(project.moderator_uids || []), targetUid] : (project.moderator_uids || []);
+            const updatedViewerUids = role === 'viewer' ? [...(project.viewer_uids || []), targetUid] : (project.viewer_uids || []);
+            await update('projects', project.id, { members: updatedMembers, member_uids: updatedMemberUids, admin_uids: updatedAdminUids, moderator_uids: updatedModeratorUids, viewer_uids: updatedViewerUids });
+            setEmailLabel(''); setUserCode('');
             toast.success(`Added ${found.displayName || found.email || 'member'} as ${role}`);
         } catch (err) {
             console.error(err);
@@ -376,14 +412,7 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
             const updatedAdminUids = (project.admin_uids || []).filter((u: string) => u !== targetUid);
             const updatedModeratorUids = (project.moderator_uids || []).filter((u: string) => u !== targetUid);
             const updatedViewerUids = (project.viewer_uids || []).filter((u: string) => u !== targetUid);
-
-            await update('projects', project.id, {
-                members: updatedMembers,
-                member_uids: updatedMemberUids,
-                admin_uids: updatedAdminUids,
-                moderator_uids: updatedModeratorUids,
-                viewer_uids: updatedViewerUids,
-            });
+            await update('projects', project.id, { members: updatedMembers, member_uids: updatedMemberUids, admin_uids: updatedAdminUids, moderator_uids: updatedModeratorUids, viewer_uids: updatedViewerUids });
             toast.success('Member removed');
         } catch {
             toast.error('Failed to remove member');
@@ -401,40 +430,17 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
             {isOwner && (
                 <div className="mb-6 space-y-3 p-4 bg-slate-900/50 rounded-xl border border-white/5">
                     <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Add Member by User Code</p>
-
                     <div className="grid grid-cols-2 gap-2">
-                        <input
-                            type="email"
-                            value={emailLabel}
-                            onChange={(e) => setEmailLabel(e.target.value)}
-                            placeholder="Email (label only)"
-                            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
-                        />
-                        <input
-                            type="text"
-                            value={userCode}
-                            onChange={(e) => setUserCode(e.target.value.toUpperCase())}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
-                            placeholder="TM-XXXXXX (User Code)"
-                            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-all"
-                        />
+                        <input type="email" value={emailLabel} onChange={(e) => setEmailLabel(e.target.value)} placeholder="Email (label only)" className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all" />
+                        <input type="text" value={userCode} onChange={(e) => setUserCode(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && handleAddMember()} placeholder="TM-XXXXXX (User Code)" className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-all" />
                     </div>
-
                     <div className="flex gap-2">
-                        <select
-                            value={role}
-                            onChange={(e) => setRole(e.target.value as any)}
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
-                        >
+                        <select value={role} onChange={(e) => setRole(e.target.value as any)} className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all">
                             <option value="admin">Admin — Full control</option>
                             <option value="moderator">Moderator — Add & edit, no delete</option>
                             <option value="viewer">Viewer — Read only + status changes</option>
                         </select>
-                        <button
-                            onClick={handleAddMember}
-                            disabled={adding || !userCode.trim()}
-                            className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all"
-                        >
+                        <button onClick={handleAddMember} disabled={adding || !userCode.trim()} className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all">
                             {adding ? '...' : 'Add'}
                         </button>
                     </div>
@@ -443,7 +449,6 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
             )}
 
             <div className="space-y-2">
-                {/* Owner row */}
                 <div className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-indigo-500/20">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-indigo-500/30 text-indigo-300 flex items-center justify-center font-bold text-xs">O</div>
@@ -455,7 +460,6 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-indigo-500/20 text-indigo-300 border-indigo-500/30">Owner</span>
                 </div>
 
-                {/* Members */}
                 {members.map((m: any) => {
                     const cfg = ROLE_CONFIG[m.role as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.viewer;
                     const isYou = m.uid === auth.currentUser?.uid;
@@ -466,20 +470,14 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
                                     {(m.email || m.uid).charAt(0).toUpperCase()}
                                 </div>
                                 <div>
-                                    <p className="text-slate-200 text-sm font-medium truncate max-w-[140px]">
-                                        {m.email || m.uid.substring(0, 8)} {isYou ? '(You)' : ''}
-                                    </p>
+                                    <p className="text-slate-200 text-sm font-medium truncate max-w-[140px]">{m.email || m.uid.substring(0, 8)} {isYou ? '(You)' : ''}</p>
                                     <p className="text-slate-500 text-[10px] font-mono">{m.uid.substring(0, 8)}…</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
                                 {isOwner && (
-                                    <button
-                                        onClick={() => handleRemoveMember(m.uid)}
-                                        className="p-1.5 text-slate-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
-                                        title="Remove member"
-                                    >
+                                    <button onClick={() => handleRemoveMember(m.uid)} className="p-1.5 text-slate-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10" title="Remove member">
                                         <Trash2 size={14} />
                                     </button>
                                 )}

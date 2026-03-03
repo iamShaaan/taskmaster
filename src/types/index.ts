@@ -35,6 +35,16 @@ export interface TimeLog {
     duration_ms: number;
 }
 
+// A time entry recorded on a project when a task timer is stopped
+export interface ProjectTimeEntry {
+    task_id: string;
+    task_title: string;
+    date: string;        // ISO date string, e.g. "2026-03-03"
+    start: Date;
+    end: Date;
+    duration_ms: number;
+}
+
 export interface Meeting {
     id: string;
     title: string;
@@ -74,8 +84,7 @@ export interface Project {
     files: FileAttachment[];
     created_at: Date;
     color: string;
-    time_logs?: TimeLog[];
-    total_time_ms?: number;
+    time_entries?: ProjectTimeEntry[];  // aggregated time from tasks
     owner_id: string;
     // Role-based member system
     members: ProjectMember[];       // full member objects (for display)

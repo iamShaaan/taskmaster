@@ -17,7 +17,13 @@ interface TaskCardProps {
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = false }) => {
-    const { isRunning, elapsed, start, stop } = useTimer(task.id, task.time_logs || []);
+    const { isRunning, elapsed, start, stop } = useTimer(
+        task.id,
+        task.time_logs || [],
+        'tasks',
+        task.project_id ?? undefined,
+        task.title
+    );
     const overdue = task.due_date ? isOverdue(task.due_date) && task.status !== 'done' : false;
     const [deleting, setDeleting] = useState(false);
 

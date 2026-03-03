@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Pencil, Trash2, CheckSquare, Calendar, ExternalLink } from 'lucide-react';
+import { Plus, FolderKanban, Pencil, Trash2, CheckSquare, Calendar, ExternalLink, Timer } from 'lucide-react';
 import { useAppStore } from '../store';
 import { ProjectForm } from '../components/projects/ProjectForm';
 import { Modal } from '../components/ui/Modal';
 import type { Project } from '../types';
 import { deleteDocById } from '../firebase/firestore';
 import { statusBadge } from '../components/ui/Badge';
+import { formatDuration } from '../utils/timeFormat';
 import toast from 'react-hot-toast';
 
 export const Projects: React.FC = () => {
@@ -42,6 +43,7 @@ export const Projects: React.FC = () => {
                         const doneTasks = projectTasks.filter((t) => t.status === 'done').length;
                         const projectMeetings = meetings.filter((m) => m.linked_project_id === project.id);
                         const progress = projectTasks.length > 0 ? Math.round((doneTasks / projectTasks.length) * 100) : 0;
+                        const totalTrackedMs = projectTasks.reduce((sum, t) => sum + (t.total_time_ms || 0), 0);
 
                         return (
                             <div key={project.id} className="group bg-slate-800 border border-slate-700/50 rounded-xl p-5 hover:border-indigo-500/40 transition-all">
@@ -98,8 +100,11 @@ export const Projects: React.FC = () => {
                                         <Calendar size={12} />
                                         <span>{projectMeetings.length} meeting{projectMeetings.length !== 1 ? 's' : ''}</span>
                                     </div>
-                                    {project.files && project.files.length > 0 && (
-                                        <div className="text-xs text-slate-500">{project.files.length} file{project.files.length !== 1 ? 's' : ''}</div>
+                                    {totalTrackedMs > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs text-amber-400/80 ml-auto">
+                                            <Timer size={12} />
+                                            <span className="font-mono font-bold">{formatDuration(totalTrackedMs)}</span>
+                                        </div>
                                     )}
                                 </div>
                             </div>
