@@ -80,6 +80,7 @@ export interface Project {
     name: string;
     description: string;
     status: 'active' | 'paused' | 'completed';
+    priority: 'low' | 'medium' | 'high';
     client_id: string | null;
     files: FileAttachment[];
     created_at: Date;

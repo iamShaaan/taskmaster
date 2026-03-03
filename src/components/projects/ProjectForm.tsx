@@ -21,6 +21,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
         name: editProject?.name || '',
         description: editProject?.description || '',
         status: editProject?.status || 'active' as Project['status'],
+        priority: editProject?.priority || 'medium' as Project['priority'],
         client_id: editProject?.client_id || '',
         color: editProject?.color || COLORS[0],
     });
@@ -32,7 +33,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
         if (!form.name.trim()) { toast.error('Project name required'); return; }
         setLoading(true);
         try {
-            const data = { ...form, client_id: form.client_id || null, files: editProject?.files || [] };
+            const data = { ...form, client_id: form.client_id || null, priority: form.priority || 'medium', files: editProject?.files || [] };
             if (editProject) {
                 await updateDocById('projects', editProject.id, data as Record<string, unknown>);
                 toast.success('Project updated!');
@@ -68,12 +69,20 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
                     </select>
                 </div>
                 <div>
-                    <label className={labelCls}>Linked Client</label>
-                    <select className={inputCls} value={form.client_id} onChange={(e) => set('client_id', e.target.value)}>
-                        <option value="">None</option>
-                        {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <label className={labelCls}>Priority</label>
+                    <select className={inputCls} value={form.priority} onChange={(e) => set('priority', e.target.value)}>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
                     </select>
                 </div>
+            </div>
+            <div>
+                <label className={labelCls}>Linked Client</label>
+                <select className={inputCls} value={form.client_id} onChange={(e) => set('client_id', e.target.value)}>
+                    <option value="">None</option>
+                    {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
             </div>
             <div>
                 <label className={labelCls}>Color</label>

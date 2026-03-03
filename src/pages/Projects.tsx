@@ -6,13 +6,13 @@ import { ProjectForm } from '../components/projects/ProjectForm';
 import { Modal } from '../components/ui/Modal';
 import type { Project } from '../types';
 import { deleteDocById } from '../firebase/firestore';
-import { statusBadge } from '../components/ui/Badge';
+import { statusBadge, priorityBadge } from '../components/ui/Badge';
 import { formatDuration } from '../utils/timeFormat';
 import toast from 'react-hot-toast';
 
 export const Projects: React.FC = () => {
     const navigate = useNavigate();
-    const { projects, tasks, meetings } = useAppStore();
+    const { projects, tasks, meetings, clients } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editProject, setEditProject] = useState<Project | undefined>();
 
@@ -76,7 +76,15 @@ export const Projects: React.FC = () => {
 
                                 {project.description && <p className="text-slate-400 text-sm mb-3 line-clamp-2">{project.description}</p>}
 
-                                <div className="flex items-center gap-2 mb-4">{statusBadge(project.status)}</div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    {statusBadge(project.status)}
+                                    {priorityBadge(project.priority || 'medium')}
+                                    {project.client_id && (
+                                        <span className="text-xs text-slate-400 bg-slate-800/50 border border-slate-700/50 px-2 py-0.5 rounded uppercase tracking-wide font-medium truncate max-w-[120px]">
+                                            {clients.find(c => c.id === project.client_id)?.name || 'Unknown Client'}
+                                        </span>
+                                    )}
+                                </div>
 
                                 {/* Progress Bar */}
                                 {projectTasks.length > 0 && (
