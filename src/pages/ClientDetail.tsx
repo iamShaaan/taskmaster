@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, Building2, Phone, Mail, Clock,
-    CheckSquare, Calendar as CalendarIcon, FileArchive, StickyNote
+    CheckSquare, Calendar as CalendarIcon, FileArchive, StickyNote, Globe
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
@@ -49,9 +49,24 @@ export const ClientDetail: React.FC = () => {
                                 Client
                             </span>
                         </div>
-                        <p className="text-slate-400 flex items-center gap-1.5 px-0.5">
-                            <Building2 size={14} /> {client.company || 'Private Client'}
-                        </p>
+                        <div className="flex items-center gap-4 text-slate-400 px-0.5 mt-1">
+                            <p className="flex items-center gap-1.5">
+                                <Building2 size={14} /> {client.company || 'Private Client'}
+                            </p>
+                            {client.website && (
+                                <a
+                                    href={client.website.startsWith('http') ? client.website : `https://${client.website}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 text-xs font-medium"
+                                >
+                                    <Globe size={12} /> Website
+                                </a>
+                            )}
+                        </div>
+                        {client.description && (
+                            <p className="text-slate-500 text-sm mt-3 px-0.5 max-w-2xl leading-relaxed">{client.description}</p>
+                        )}
                     </div>
                 </div>
 
@@ -101,6 +116,16 @@ export const ClientDetail: React.FC = () => {
                             </a>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {/* Internal Client Notes */}
+            {client.notes && (
+                <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-5">
+                    <h2 className="text-slate-300 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <StickyNote size={13} className="text-amber-400" /> Internal Notes
+                    </h2>
+                    <p className="text-slate-400 text-sm whitespace-pre-wrap leading-relaxed">{client.notes}</p>
                 </div>
             )}
 
