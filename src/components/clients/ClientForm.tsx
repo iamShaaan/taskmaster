@@ -19,6 +19,8 @@ export const ClientForm: React.FC<ClientFormProps> = ({ onClose, editClient }) =
     const [form, setForm] = useState({
         name: editClient?.name || '',
         company: editClient?.company || '',
+        description: editClient?.description || '',
+        website: editClient?.website || '',
         notes: editClient?.notes || '',
         phones: editClient?.phones || [] as string[],
         emails: editClient?.emails || [] as string[],
@@ -84,6 +86,14 @@ export const ClientForm: React.FC<ClientFormProps> = ({ onClose, editClient }) =
                 <div>
                     <label className={labelCls}>Company</label>
                     <input className={inputCls} placeholder="Acme Corp" value={form.company} onChange={(e) => set('company', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                    <label className={labelCls}>Short Description</label>
+                    <input className={inputCls} placeholder="E.g. E-commerce giant" value={form.description} onChange={(e) => set('description', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                    <label className={labelCls}>Website</label>
+                    <input className={inputCls} type="url" placeholder="https://example.com" value={form.website} onChange={(e) => set('website', e.target.value)} />
                 </div>
             </div>
 

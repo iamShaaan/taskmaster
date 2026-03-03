@@ -65,7 +65,9 @@ export interface Meeting {
 export interface Client {
     id: string;
     name: string;
+    description?: string;
     company: string;
+    website?: string;
     emails: string[];
     phones: string[];
     notes: string;

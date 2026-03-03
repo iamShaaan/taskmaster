@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Phone, Mail, Building2, Pencil, Trash2, FileArchive, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Plus, Phone, Mail, Building2, Pencil, Trash2, FileArchive, ChevronDown, ChevronUp, ExternalLink, Globe } from 'lucide-react';
 import { useAppStore } from '../store';
 import { ClientForm } from '../components/clients/ClientForm';
 import { Modal } from '../components/ui/Modal';
@@ -60,7 +60,21 @@ export const Clients: React.FC = () => {
                                     >
                                         {client.name}
                                     </h3>
-                                    {client.company && <p className="text-slate-400 text-sm flex items-center gap-1"><Building2 size={12} />{client.company}</p>}
+                                    <div className="flex items-center gap-2">
+                                        {client.company && <p className="text-slate-400 text-sm flex items-center gap-1"><Building2 size={12} />{client.company}</p>}
+                                        {client.website && (
+                                            <a
+                                                href={client.website.startsWith('http') ? client.website : `https://${client.website}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-indigo-400 hover:text-indigo-300 text-sm flex items-center gap-1 transition-colors"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Globe size={12} /> Website
+                                            </a>
+                                        )}
+                                    </div>
+                                    {client.description && <p className="text-slate-500 text-xs mt-1 line-clamp-2">{client.description}</p>}
                                 </div>
                                 <div className="flex items-center gap-1">
                                     {client.phones?.length > 0 && (
