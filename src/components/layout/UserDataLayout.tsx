@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Users, FileText, HardDrive, Archive } from 'lucide-react';
+import { Users, FileText, HardDrive, Archive, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { db, APP_ID } from '../../firebase/config';
@@ -16,6 +16,7 @@ import { storage } from '../../firebase/config';
 const navItems = [
     { to: '/user-data', icon: Users, label: 'Clients', end: true },
     { to: '/user-data/team', icon: Users, label: 'Team Members' },
+    { to: '/user-data/my-teams', icon: Shield, label: 'My Teams' },
     { to: '/user-data/notes', icon: FileText, label: 'Notes & Vault' },
     { to: '/user-data/files', icon: HardDrive, label: 'Files' },
     { to: '/user-data/archive', icon: Archive, label: 'Archive' },

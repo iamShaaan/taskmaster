@@ -64,7 +64,33 @@ service cloud.firestore {
       allow create: if isAuthed() && resource == null;
     }
 
-    // ─── All other app data (tasks, clients, notes, meetings, actions…) ─────
+    // ─── Tasks (assignee can update) ──────────────────────────────────────────
+    match /apps/{appId}/tasks/{docId} {
+      // Owner: full access
+      allow read, write, delete: if isOwner(resource);
+
+      // Orphaned docs
+      allow read, write, delete: if isOrphan(resource);
+
+      // Assignee: can read + update (NOT delete)
+      allow read, update: if isAuthed()
+        && resource != null
+        && resource.data.assignee_id == request.auth.uid;
+
+      // Project members: can read tasks in their project
+      allow read: if isAuthed()
+        && resource != null
+        && resource.data.project_member_uids is list
+        && request.auth.uid in resource.data.project_member_uids;
+
+      // Any authenticated user can read (for shared contexts)
+      allow read: if isAuthed();
+
+      // Create new tasks
+      allow create: if isAuthed() && resource == null;
+    }
+
+    // ─── All other app data (clients, notes, meetings, actions…) ─────
     match /apps/{appId}/{collection}/{docId} {
       // Owner: full access
       allow read, write: if isOwner(resource);

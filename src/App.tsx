@@ -21,6 +21,7 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { UserDataLayout } from './components/layout/UserDataLayout';
 import { TeamMembers } from './pages/TeamMembers';
 import { ArchivePage } from './pages/ArchivePage';
+import { MyTeams } from './pages/MyTeams';
 
 const DataLoader: React.FC = () => {
   const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -170,6 +171,7 @@ function App() {
               <Route index element={<Clients />} />
               <Route path="clients/:id" element={<ClientDetail />} />
               <Route path="team" element={<TeamMembers />} />
+              <Route path="my-teams" element={<MyTeams />} />
               <Route path="notes" element={<Notes />} />
               <Route path="files" element={<Files />} />
               <Route path="archive" element={<ArchivePage />} />

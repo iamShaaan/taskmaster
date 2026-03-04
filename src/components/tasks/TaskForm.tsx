@@ -86,16 +86,20 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
         try {
             const proj = projects.find(p => p.id === form.project_id);
             let assigneeEmail = null;
+            let assigneeName = null;
             if (form.assignee_id === user?.uid) {
                 assigneeEmail = user?.email;
-            } else {
+                assigneeName = user?.displayName || user?.email?.split('@')[0] || null;
+            } else if (form.assignee_id) {
                 const selectedAssignee = proj?.members?.find(m => m.uid === form.assignee_id);
                 assigneeEmail = selectedAssignee ? selectedAssignee.email : null;
+                assigneeName = assigneeEmail?.split('@')[0] || null;
             }
 
             const data = {
                 ...form,
                 assignee_id: form.assignee_id || null,
+                assignee_name: assigneeName,
                 assignee_email: assigneeEmail,
                 project_member_uids: proj ? proj.member_uids : [],
                 due_date: form.due_date ? new Date(form.due_date) : null,

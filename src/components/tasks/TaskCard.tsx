@@ -28,6 +28,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
     const clientName = task.client_id ? clients.find(c => c.id === task.client_id)?.name : null;
     const projectName = task.project_id ? projects.find(p => p.id === task.project_id)?.name : null;
 
+    // Permission checks
+    const uid = auth.currentUser?.uid;
+    const isOwner = uid === task.owner_id;
+    const isAssignee = uid === task.assignee_id;
+    const canInteract = isOwner || isAssignee; // Can edit, set timer
+    const canDelete = isOwner; // Only owner can delete
+
     const handleDelete = async () => {
         if (!confirm('Delete this task? You can restore it from Archive within 30 days.')) return;
         setDeleting(true);
@@ -74,12 +81,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                     </button>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                    <button onClick={() => onEdit(task)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
-                        <Pencil size={14} />
-                    </button>
-                    <button onClick={handleDelete} disabled={deleting} className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40">
-                        {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    </button>
+                    {canInteract && (
+                        <button onClick={() => onEdit(task)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
+                            <Pencil size={14} />
+                        </button>
+                    )}
+                    {canDelete && (
+                        <button onClick={handleDelete} disabled={deleting} className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40">
+                            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -105,6 +116,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                         <div className="flex items-center gap-2 text-xs py-1 px-2 rounded-md text-indigo-300 bg-indigo-500/10 border border-indigo-500/10">
                             <FolderKanban size={11} className="flex-shrink-0" />
                             <span className="font-medium truncate">{projectName}</span>
+                        </div>
+                    )}
+                    {/* Assignee indicator for shared tasks */}
+                    {task.assignee_name && (
+                        <div className="flex items-center gap-2 text-xs py-1 px-2 rounded-md text-purple-300 bg-purple-500/10 border border-purple-500/10">
+                            <Users size={11} className="flex-shrink-0" />
+                            <span className="font-medium truncate">Assigned: {task.assignee_name}{isAssignee ? ' (You)' : ''}</span>
                         </div>
                     )}
                     {/* Due date */}
@@ -137,18 +155,23 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                         {totalMs > 0 ? formatDuration(totalMs) : '00:00:00'}
                     </span>
                 </div>
-                <button
-                    onClick={isRunning ? stop : start}
-                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${isRunning
-                        ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
-                        : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-500/20'
-                        }`}
-                >
-                    {isRunning ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                    {isRunning ? 'STOP' : 'START'}
-                </button>
+                {canInteract ? (
+                    <button
+                        onClick={isRunning ? stop : start}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${isRunning
+                            ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
+                            : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-500/20'
+                            }`}
+                    >
+                        {isRunning ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                        {isRunning ? 'STOP' : 'START'}
+                    </button>
+                ) : (
+                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">View Only</span>
+                )}
             </div>
             {showDetails && <TaskDetailsModal task={task} onClose={() => setShowDetails(false)} />}
         </motion.div>
     );
 };
+
