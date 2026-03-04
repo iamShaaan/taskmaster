@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store';
+import { useAuth } from '../../hooks/useAuth';
 import { createDoc, updateDocById } from '../../firebase/firestore';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
@@ -14,6 +15,7 @@ const inputCls = 'w-full bg-slate-800 border border-slate-700 text-slate-100 rou
 const labelCls = 'block text-slate-400 text-xs font-medium mb-1';
 
 export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
+    const { user } = useAuth();
     const { clients, projects } = useAppStore();
     const [loading, setLoading] = useState(false);
     const [tag, setTag] = useState('');
@@ -60,8 +62,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
     const handleProjectChange = (projectId: string) => {
         setForm(f => {
             const proj = projects.find(p => p.id === projectId);
-            const isValidAssignee = proj?.members?.some(m => m.uid === f.assignee_id);
-            return { ...f, project_id: projectId, assignee_id: isValidAssignee ? f.assignee_id : '' };
+            const isUser = f.assignee_id === user?.uid;
+            const isProjectMember = proj?.members?.some(m => m.uid === f.assignee_id);
+            return { ...f, project_id: projectId, assignee_id: isUser || isProjectMember ? f.assignee_id : '' };
         });
     };
 
@@ -82,11 +85,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
         setLoading(true);
         try {
             const proj = projects.find(p => p.id === form.project_id);
-            const selectedAssignee = proj?.members?.find(m => m.uid === form.assignee_id);
+            let assigneeEmail = null;
+            if (form.assignee_id === user?.uid) {
+                assigneeEmail = user?.email;
+            } else {
+                const selectedAssignee = proj?.members?.find(m => m.uid === form.assignee_id);
+                assigneeEmail = selectedAssignee ? selectedAssignee.email : null;
+            }
+
             const data = {
                 ...form,
                 assignee_id: form.assignee_id || null,
-                assignee_email: selectedAssignee ? selectedAssignee.email : null,
+                assignee_email: assigneeEmail,
                 project_member_uids: proj ? proj.member_uids : [],
                 due_date: form.due_date ? new Date(form.due_date) : null,
                 project_id: form.project_id || null,
@@ -208,10 +218,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
                         className={inputCls}
                         value={form.assignee_id}
                         onChange={(e) => set('assignee_id', e.target.value)}
-                        disabled={!form.project_id || projectMembers.length === 0}
                     >
                         <option value="">— Unassigned —</option>
-                        {projectMembers.map((m) => <option key={m.uid} value={m.uid}>{m.email}</option>)}
+                        {user && <option value={user.uid}>Me ({user.email})</option>}
+                        {projectMembers.filter(m => m.uid !== user?.uid).map((m) => (
+                            <option key={m.uid} value={m.uid}>{m.email}</option>
+                        ))}
                     </select>
                 </div>
             </div>

@@ -1,16 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { db, APP_ID, storage } from '../firebase/config';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { searchByUserCode } from '../firebase/firestore';
+import React from 'react';
 import {
     User, Globe, Building2,
     Zap, Clock, CheckCircle2, Camera, FileSignature, Save, Loader2,
-    Edit3, Mail, ExternalLink, X, Plus, Users, Layout
+    Edit3, Mail, ExternalLink, X, Plus, Layout
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { useAppStore } from '../store';
 import type { UserProfile } from '../types';
 
 // Safe URL hostname extractor - never throws
@@ -40,22 +33,18 @@ interface DashboardViewProps {
 interface EditViewProps {
     profile: Partial<UserProfile>;
     setProfile: React.Dispatch<React.SetStateAction<Partial<UserProfile>>>;
-    newMemberCode: string;
-    setNewMemberCode: React.Dispatch<React.SetStateAction<string>>;
     newPortfolioUrl: string;
     setNewPortfolioUrl: React.Dispatch<React.SetStateAction<string>>;
     saving: boolean;
     onSave: () => void;
     onDiscard: () => void;
     onFileUpload: (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'signature') => void;
-    onAddMember: () => void;
-    onRemoveMember: (email: string) => void;
     onAddPortfolio: () => void;
     onRemovePortfolio: (url: string) => void;
 }
 
 // ─── Dashboard View (STABLE TOP-LEVEL COMPONENT) ─────────────────────────────
-const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit }) => (
+export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit }) => (
     <div className="space-y-8">
         {/* Header / Hero Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -238,62 +227,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
                 </div>
             </div>
 
-            {/* Team Directory */}
-            <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-3xl flex flex-col">
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-emerald-500/20 rounded-2xl"><Users size={24} className="text-emerald-400" /></div>
-                        <div>
-                            <h2 className="text-white text-xl font-black">Team Contact Directory</h2>
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Internal sharing node</p>
-                        </div>
-                    </div>
-                    <span className="bg-slate-950/50 border border-white/5 px-4 py-1 rounded-full text-[10px] font-black text-slate-400 uppercase">
-                        {profile.teamMembers?.length || 0} Members
-                    </span>
-                </div>
-
-                <div className="flex-1 space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                    {(!profile.teamMembers || profile.teamMembers.length === 0) ? (
-                        <div className="h-full flex flex-col items-center justify-center opacity-30 text-center py-12 border-2 border-dashed border-slate-800 rounded-3xl">
-                            <Users size={32} className="mb-2 text-slate-500" />
-                            <p className="text-xs font-medium text-slate-400">Team directory is currently empty</p>
-                        </div>
-                    ) : (
-                        profile.teamMembers.map((member, idx) => (
-                            <div key={idx} className="flex items-center gap-4 bg-slate-950/40 p-4 rounded-2xl border border-white/5 group hover:border-emerald-500/30 transition-all">
-                                <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-emerald-400 font-black border border-white/5">
-                                    {member.email.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-white text-sm font-bold truncate">{member.name || member.email || member.user_code}</p>
-                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{member.user_code ? `Code: ${member.user_code}` : 'Active Member'}</p>
-                                </div>
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"><Mail size={14} /></button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-
-                <button
-                    onClick={onEdit}
-                    className="mt-8 w-full py-4 border-2 border-dashed border-slate-800 rounded-3xl text-slate-500 hover:text-indigo-400 hover:border-indigo-500/30 transition-all font-bold text-sm flex items-center justify-center gap-2"
-                >
-                    <Plus size={18} /> Manage Team Members
-                </button>
-            </div>
         </div>
     </div>
 );
 
 // ─── Edit View (STABLE TOP-LEVEL COMPONENT) ───────────────────────────────────
-const EditView: React.FC<EditViewProps> = ({
-    profile, setProfile, newMemberCode, setNewMemberCode,
-    newPortfolioUrl, setNewPortfolioUrl,
-    saving, onSave, onDiscard, onFileUpload, onAddMember, onRemoveMember,
-    onAddPortfolio, onRemovePortfolio
+export const EditView: React.FC<EditViewProps> = ({
+    profile, setProfile, newPortfolioUrl, setNewPortfolioUrl,
+    saving, onSave, onDiscard, onFileUpload, onAddPortfolio, onRemovePortfolio
 }) => (
     <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
@@ -468,269 +409,9 @@ const EditView: React.FC<EditViewProps> = ({
                     </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/5">
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
-                        <Users size={18} className="text-indigo-400" /> Manage Team Access
-                    </h3>
-                    <div className="space-y-4">
-                        <div className="flex gap-3">
-                            <div className="relative flex-1">
-                                <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
-                                <input
-                                    className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 pl-12 text-white outline-none focus:border-indigo-500/50 transition-all font-bold"
-                                    placeholder="Add member by their User Code (e.g. TM-A3X9P2)..."
-                                    value={newMemberCode}
-                                    onChange={(e) => setNewMemberCode(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), onAddMember())}
-                                />
-                            </div>
-                            <button
-                                onClick={onAddMember}
-                                className="bg-slate-800 hover:bg-slate-700 text-white px-8 rounded-2xl font-black transition-all"
-                            >
-                                Invite
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4">
-                            {(profile.teamMembers || []).map((member, idx) => (
-                                <div key={idx} className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold text-xs">
-                                            {member.email.charAt(0).toUpperCase()}
-                                        </div>
-                                        <span className="text-slate-200 text-xs font-bold truncate max-w-[150px]">{member.name || member.email || member.user_code}</span>
-                                    </div>
-                                    <button
-                                        onClick={() => onRemoveMember(member.email || member.user_code || '')}
-                                        className="p-2 text-slate-600 hover:text-red-400 transition-colors"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 );
 
-// ─── Main Profile Component ───────────────────────────────────────────────────
-export const Profile: React.FC = () => {
-    const { user } = useAuth();
-    const { tasks, projects, meetings } = useAppStore();
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [profile, setProfile] = useState<Partial<UserProfile>>({});
-    const [newMemberCode, setNewMemberCode] = useState('');
-    const [newPortfolioUrl, setNewPortfolioUrl] = useState('');
 
-    const [stats, setStats] = useState({
-        score: 0,
-        timeDelivered: 0,
-        completionRate: 0,
-        activeProjects: 0
-    });
-
-    useEffect(() => {
-        if (user) {
-            fetchProfile();
-            calculateProductivity();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, tasks, projects, meetings]);
-
-    const fetchProfile = async () => {
-        try {
-            const docRef = doc(db, `apps/${APP_ID}/users`, user!.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data() as UserProfile;
-                // Backfill user_code for existing users who don't have one
-                if (!data.user_code) {
-                    const user_code = `TM-${user!.uid.substring(0, 6).toUpperCase()}`;
-                    await setDoc(docRef, { user_code }, { merge: true });
-                    data.user_code = user_code;
-                }
-                setProfile(data);
-            } else {
-                const user_code = `TM-${user!.uid.substring(0, 6).toUpperCase()}`;
-                setProfile({
-                    uid: user!.uid,
-                    user_code,
-                    displayName: user!.displayName || '',
-                    personalEmail: user!.email || '',
-                    teamMembers: []
-                });
-            }
-        } catch {
-            toast.error('Failed to load profile');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const calculateProductivity = () => {
-        const totalTasks = tasks.length;
-        const doneTasks = tasks.filter(t => t.status === 'done').length;
-        const compRate = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0;
-        const totalTimeMs = tasks.reduce((acc, t) => acc + (t.total_time_ms || 0), 0);
-        const hours = totalTimeMs / (1000 * 60 * 60);
-        const activePrj = projects.filter(p => p.status === 'active').length;
-
-        const timeScore = Math.min((hours / 8) * 40, 40);
-        const completionScore = (compRate / 100) * 30;
-        const projectScore = Math.min((activePrj / 5) * 20, 20);
-        const meetingScore = Math.min((meetings.length / 3) * 10, 10);
-
-        const totalScore = Math.round(timeScore + completionScore + projectScore + meetingScore);
-
-        setStats({
-            score: totalScore,
-            timeDelivered: Math.round(hours * 10) / 10,
-            completionRate: Math.round(compRate),
-            activeProjects: activePrj
-        });
-    };
-
-    const handleSave = async () => {
-        if (!user) return;
-        setSaving(true);
-        try {
-            await setDoc(doc(db, `apps/${APP_ID}/users`, user.uid), {
-                ...profile,
-                productivityScore: stats.score,
-                lastCalculated: serverTimestamp(),
-                updated_at: serverTimestamp()
-            }, { merge: true });
-            toast.success('Profile updated successfully');
-            setIsEditing(false);
-        } catch {
-            toast.error('Failed to save profile');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'photo' | 'signature') => {
-        const file = e.target.files?.[0];
-        if (!file || !user) return;
-
-        const path = `apps/${APP_ID}/profiles/${user.uid}/${type === 'photo' ? 'avatar' : 'signature'}_${Date.now()}`;
-        const storageRef = ref(storage, path);
-
-        try {
-            toast.loading(`Uploading ${type}...`, { id: 'upload' });
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-
-            if (type === 'photo') setProfile(p => ({ ...p, photoURL: url }));
-            else setProfile(p => ({ ...p, signatureURL: url }));
-
-            toast.success(`${type === 'photo' ? 'Photo' : 'Signature'} uploaded!`, { id: 'upload' });
-        } catch {
-            toast.error(`Failed to upload ${type}`, { id: 'upload' });
-        }
-    };
-
-    const addTeamMember = async () => {
-        if (!newMemberCode.trim()) return;
-        const codeToFind = newMemberCode.trim().toUpperCase();
-
-        // Don't add self
-        if (codeToFind === profile.user_code) {
-            toast.error("You cannot add yourself.");
-            return;
-        }
-
-        if (profile.teamMembers?.some(m => m.user_code === codeToFind)) {
-            toast.error('Member already added');
-            return;
-        }
-
-        toast.loading("Searching for user...", { id: "search-user" });
-        try {
-            const users = await searchByUserCode(codeToFind);
-            if (users.length === 0) {
-                toast.error("No user found with that code.", { id: "search-user" });
-                return;
-            }
-            const foundUser = users[0];
-
-            setProfile(p => ({
-                ...p,
-                teamMembers: [...(p.teamMembers || []), {
-                    uid: foundUser.uid || foundUser.id,
-                    user_code: foundUser.user_code,
-                    name: foundUser.displayName || foundUser.fullName || '',
-                    email: foundUser.professionalEmail || foundUser.personalEmail || ''
-                }]
-            }));
-            setNewMemberCode('');
-            toast.success("Team member added!", { id: "search-user" });
-        } catch (e) {
-            toast.error("Failed to add user.", { id: "search-user" });
-            console.error(e);
-        }
-    };
-
-    const removeTeamMember = (identifier: string) => {
-        setProfile(p => ({
-            ...p,
-            teamMembers: p.teamMembers?.filter(m => (m.user_code !== identifier && m.email !== identifier)) || []
-        }));
-    };
-
-    const addPortfolio = () => {
-        if (!newPortfolioUrl.trim()) return;
-        const url = newPortfolioUrl.trim();
-        if ((profile.websites || []).includes(url)) {
-            toast.error('Link already added');
-            return;
-        }
-        setProfile(p => ({ ...p, websites: [...(p.websites || []), url] }));
-        setNewPortfolioUrl('');
-    };
-
-    const removePortfolio = (url: string) => {
-        setProfile(p => ({ ...p, websites: (p.websites || []).filter(w => w !== url) }));
-    };
-
-    if (loading) return (
-        <div className="flex items-center justify-center h-full">
-            <Loader2 className="animate-spin text-indigo-500" size={32} />
-        </div>
-    );
-
-    return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {isEditing ? (
-                <EditView
-                    profile={profile}
-                    setProfile={setProfile}
-                    newMemberCode={newMemberCode}
-                    setNewMemberCode={setNewMemberCode}
-                    newPortfolioUrl={newPortfolioUrl}
-                    setNewPortfolioUrl={setNewPortfolioUrl}
-                    saving={saving}
-                    onSave={handleSave}
-                    onDiscard={() => setIsEditing(false)}
-                    onFileUpload={handleFileUpload}
-                    onAddMember={addTeamMember}
-                    onRemoveMember={removeTeamMember}
-                    onAddPortfolio={addPortfolio}
-                    onRemovePortfolio={removePortfolio}
-                />
-            ) : (
-                <DashboardView
-                    profile={profile}
-                    stats={stats}
-                    onEdit={() => setIsEditing(true)}
-                />
-            )}
-        </div>
-    );
-};

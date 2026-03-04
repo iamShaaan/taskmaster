@@ -18,7 +18,8 @@ import { Sparkles } from 'lucide-react';
 
 import { ClientDetail } from './pages/ClientDetail';
 import { ProjectDetail } from './pages/ProjectDetail';
-import { Profile } from './pages/Profile';
+import { UserDataLayout } from './components/layout/UserDataLayout';
+import { TeamMembers } from './pages/TeamMembers';
 import { ArchivePage } from './pages/ArchivePage';
 
 const DataLoader: React.FC = () => {
@@ -162,14 +163,17 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="meetings" element={<Meetings />} />
-            <Route path="clients" element={<Clients />} />
-            <Route path="clients/:id" element={<ClientDetail />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
-            <Route path="notes" element={<Notes />} />
-            <Route path="files" element={<Files />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="archive" element={<ArchivePage />} />
+
+            <Route path="user-data" element={<UserDataLayout />}>
+              <Route index element={<Clients />} />
+              <Route path="clients/:id" element={<ClientDetail />} />
+              <Route path="team" element={<TeamMembers profile={{}} setProfile={() => { }} />} />
+              <Route path="notes" element={<Notes />} />
+              <Route path="files" element={<Files />} />
+              <Route path="archive" element={<ArchivePage />} />
+            </Route>
           </Route>
         )}
       </Routes>

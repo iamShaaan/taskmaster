@@ -7,14 +7,10 @@ import {
     Calendar,
     Users,
     FolderKanban,
-    FileText,
-    HardDrive,
     ChevronLeft,
     ChevronRight,
     Sparkles,
-    LogOut,
-    User,
-    Archive
+    LogOut
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { db, APP_ID } from '../../firebase/config';
@@ -24,12 +20,8 @@ const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { to: '/meetings', icon: Calendar, label: 'Meetings' },
-    { to: '/clients', icon: Users, label: 'Clients' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
-    { to: '/notes', icon: FileText, label: 'Notes & Vault' },
-    { to: '/files', icon: HardDrive, label: 'Files' },
-    { to: '/archive', icon: Archive, label: 'Archive' },
-    { to: '/profile', icon: User, label: 'My Profile' },
+    { to: '/user-data', icon: Users, label: 'User Data' },
 ];
 
 export const Sidebar: React.FC = () => {

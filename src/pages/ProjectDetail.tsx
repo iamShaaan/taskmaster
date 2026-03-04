@@ -13,22 +13,26 @@ import { auth } from '../firebase/config';
 import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
-import type { Project, ProjectTimeEntry } from '../types';
+import type { Project, ProjectTimeEntry, Task, TimeLog } from '../types';
 
 // ─── Time Records Section ──────────────────────────────────────────────────────
 
-const ProjectTimeLogs: React.FC<{ project: Project; tasks: any[] }> = ({ project, tasks }) => {
+const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ project, tasks }) => {
     // Derive time entries: combine project-level time_entries (from stopped task timers)
     // PLUS live task time_logs (for tasks already stored in Firestore)
     const taskEntries = tasks.flatMap((t) =>
-        (t.time_logs || []).map((log: any) => ({
+        (t.time_logs || []).map((log: TimeLog) => ({
             task_id: t.id,
             task_title: t.title,
-            date: new Date(log.start instanceof Date ? log.start : log.start?.toDate?.() ?? log.start)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            date: new Date(log.start instanceof Date ? log.start : (log.start as any)?.toDate?.() ?? log.start)
                 .toISOString().split('T')[0],
             start: log.start,
             end: log.end,
             duration_ms: log.duration_ms,
+            user_id: log.user_id,
+            user_name: log.user_name,
+            user_email: log.user_email,
         }))
     );
 
@@ -46,7 +50,9 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: any[] }> = ({ project
 
     // Sort newest first
     all.sort((a, b) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const aTime = a.start instanceof Date ? a.start.getTime() : new Date(a.start as any).getTime();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bTime = b.start instanceof Date ? b.start.getTime() : new Date(b.start as any).getTime();
         return bTime - aTime;
     });
@@ -76,8 +82,9 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: any[] }> = ({ project
             </p>
 
             {/* Table header */}
-            <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 mb-2">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 mb-2">
                 <span>Task</span>
+                <span>User</span>
                 <span className="text-right">Date</span>
                 <span className="text-right">Duration</span>
             </div>
@@ -90,7 +97,7 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: any[] }> = ({ project
                     return (
                         <div
                             key={idx}
-                            className="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-3 py-2.5 bg-slate-900/50 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all group"
+                            className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center px-3 py-2.5 bg-slate-900/50 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all group"
                         >
                             <div className="flex items-center gap-2 min-w-0">
                                 <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 flex-shrink-0" />
@@ -98,6 +105,9 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: any[] }> = ({ project
                                     {entry.task_title}
                                 </span>
                             </div>
+                            <span className="text-slate-400 text-xs truncate max-w-[120px]">
+                                {entry.user_name || entry.user_email?.split('@')[0] || 'Unknown'}
+                            </span>
                             <span className="text-slate-500 text-xs text-right whitespace-nowrap">{dateLabel}</span>
                             <span className="text-amber-400 text-xs font-mono font-bold text-right whitespace-nowrap">
                                 {formatDuration(entry.duration_ms)}
@@ -368,7 +378,7 @@ const ROLE_CONFIG = {
     viewer: { label: 'Viewer', color: 'bg-slate-700/50 text-slate-300 border-slate-600/30' },
 };
 
-const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
+const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
     const [emailLabel, setEmailLabel] = useState('');
     const [userCode, setUserCode] = useState('');
     const [role, setRole] = useState<'admin' | 'moderator' | 'viewer'>('moderator');
@@ -407,19 +417,20 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
     const handleRemoveMember = async (targetUid: string) => {
         try {
             const { updateDocById: update } = await import('../firebase/firestore');
-            const updatedMembers = (project.members || []).filter((m: any) => m.uid !== targetUid);
+            const updatedMembers = (project.members || []).filter((m: { uid: string }) => m.uid !== targetUid);
             const updatedMemberUids = (project.member_uids || []).filter((u: string) => u !== targetUid);
             const updatedAdminUids = (project.admin_uids || []).filter((u: string) => u !== targetUid);
             const updatedModeratorUids = (project.moderator_uids || []).filter((u: string) => u !== targetUid);
             const updatedViewerUids = (project.viewer_uids || []).filter((u: string) => u !== targetUid);
             await update('projects', project.id, { members: updatedMembers, member_uids: updatedMemberUids, admin_uids: updatedAdminUids, moderator_uids: updatedModeratorUids, viewer_uids: updatedViewerUids });
             toast.success('Member removed');
-        } catch {
+        } catch (e) {
+            console.error(e);
             toast.error('Failed to remove member');
         }
     };
 
-    const members: any[] = project.members || [];
+    const members = project.members || [];
 
     return (
         <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6">
@@ -435,7 +446,7 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
                         <input type="text" value={userCode} onChange={(e) => setUserCode(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && handleAddMember()} placeholder="TM-XXXXXX (User Code)" className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-all" />
                     </div>
                     <div className="flex gap-2">
-                        <select value={role} onChange={(e) => setRole(e.target.value as any)} className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all">
+                        <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'moderator' | 'viewer')} className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all">
                             <option value="admin">Admin — Full control</option>
                             <option value="moderator">Moderator — Add & edit, no delete</option>
                             <option value="viewer">Viewer — Read only + status changes</option>
@@ -460,7 +471,7 @@ const TeamMembers: React.FC<{ project: any }> = ({ project }) => {
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-indigo-500/20 text-indigo-300 border-indigo-500/30">Owner</span>
                 </div>
 
-                {members.map((m: any) => {
+                {members.map((m) => {
                     const cfg = ROLE_CONFIG[m.role as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.viewer;
                     const isYou = m.uid === auth.currentUser?.uid;
                     return (

@@ -2,39 +2,54 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckSquare, Calendar, Users, FolderKanban, Timer,
-    TrendingUp, Clock, ArrowRight, Flame, CircleCheck, AlertCircle, Loader2
+    TrendingUp, Clock, ArrowRight, Flame, CircleCheck, AlertCircle, Loader2, UserPlus
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { formatDuration, formatDateTime } from '../utils/timeFormat';
 import { statusBadge, priorityBadge } from '../components/ui/Badge';
 import { Link } from 'react-router-dom';
+import { Modal } from '../components/ui/Modal';
+import { ClientForm } from '../components/clients/ClientForm';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({
-    icon: Icon, label, value, sub, color, to, loading
+    icon: Icon, label, value, sub, color, to, loading, actionIcon: ActionIcon, onAction
 }: {
     icon: React.ElementType; label: string; value: number | string; sub?: string;
-    color: string; to: string; loading?: boolean;
+    color: string; to: string; loading?: boolean; actionIcon?: React.ElementType; onAction?: (e: React.MouseEvent) => void;
 }) => (
-    <Link to={to}>
-        <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 sm:p-5 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all cursor-pointer group flex flex-col h-full justify-between"
-        >
-            <div className="flex items-center justify-between mb-4">
-                <div className={`p-2.5 rounded-xl ${color}`}><Icon size={18} /></div>
-                <ArrowRight size={14} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
-            </div>
-            {loading ? (
-                <Loader2 size={20} className="animate-spin text-slate-600 mb-1" />
-            ) : (
-                <p className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">{value}</p>
-            )}
-            <p className="text-slate-400 text-xs sm:text-sm mt-1 font-medium">{label}</p>
-            {sub && <p className="text-slate-600 text-xs mt-0.5">{sub}</p>}
-        </motion.div>
-    </Link>
+    <div className="relative h-full flex flex-col">
+        <Link to={to} className="flex-1 block h-full">
+            <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 sm:p-5 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.1)] transition-all cursor-pointer group flex flex-col h-full justify-between"
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <div className={`p-2.5 rounded-xl ${color}`}><Icon size={18} /></div>
+                    <ArrowRight size={14} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
+                </div>
+                {loading ? (
+                    <Loader2 size={20} className="animate-spin text-slate-600 mb-1" />
+                ) : (
+                    <p className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">{value}</p>
+                )}
+                <div className="flex items-center justify-between mt-1">
+                    <p className="text-slate-400 text-xs sm:text-sm font-medium">{label}</p>
+                    {sub && <p className="text-slate-600 text-xs">{sub}</p>}
+                </div>
+            </motion.div>
+        </Link>
+        {ActionIcon && onAction && (
+            <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction(e); }}
+                className={`absolute top-4 right-10 p-2 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition-all shadow-sm z-10 ${color.includes('emerald') ? 'hover:text-emerald-400' : ''}`}
+                title={`Quick add ${label.toLowerCase()}`}
+            >
+                <ActionIcon size={16} />
+            </button>
+        )}
+    </div>
 );
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -42,6 +57,7 @@ export const Dashboard: React.FC = () => {
     // ✅ Read from store only — App.tsx DataLoader owns all Firestore subscriptions.
     //    No duplicate listeners here.
     const { tasks, meetings, clients, projects } = useAppStore();
+    const [showClientForm, setShowClientForm] = React.useState(false);
 
     // Loading: store starts as empty arrays; show skeleton state if nothing loaded yet
     const isLoading = tasks.length === 0 && meetings.length === 0 && clients.length === 0 && projects.length === 0;
@@ -101,10 +117,12 @@ export const Dashboard: React.FC = () => {
                     loading={isLoading}
                 />
                 <StatCard
-                    icon={Users} label="Clients" to="/clients"
+                    icon={Users} label="Clients" to="/user-data"
                     value={clients.length}
                     color="bg-emerald-500/20 text-emerald-400"
                     loading={isLoading}
+                    actionIcon={UserPlus}
+                    onAction={() => setShowClientForm(true)}
                 />
                 <StatCard
                     icon={FolderKanban} label="Active Projects" to="/projects"
@@ -296,6 +314,10 @@ export const Dashboard: React.FC = () => {
                     </Link>
                 </motion.div>
             )}
+
+            <Modal isOpen={showClientForm} onClose={() => setShowClientForm(false)} title="Add Client" size="lg">
+                <ClientForm onClose={() => setShowClientForm(false)} />
+            </Modal>
         </div>
     );
 };
