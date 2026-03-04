@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Users, FileText, HardDrive, Archive } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { db, APP_ID } from '../../firebase/config';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,6 +23,7 @@ const navItems = [
 export const UserDataLayout: React.FC = () => {
     const { user } = useAuth();
     const { tasks, projects, meetings } = useAppStore();
+    const location = useLocation();
 
     // Profile State
     const [loading, setLoading] = useState(true);
@@ -194,29 +196,44 @@ export const UserDataLayout: React.FC = () => {
                 </div>
 
                 {/* Horizontal Navigation */}
-                <div className="flex overflow-x-auto pb-4 gap-2 scrollbar-hide shrink-0">
+                <div className="flex overflow-x-auto pb-4 gap-2 scrollbar-hide shrink-0 snap-x">
                     {navItems.map(({ to, icon: Icon, label, end }) => (
                         <NavLink
                             key={to}
                             to={to}
                             end={end}
                             className={({ isActive }) =>
-                                `flex items-center gap-2 px-5 py-3 rounded-2xl whitespace-nowrap transition-all flex-shrink-0 border font-bold text-sm shadow-sm
+                                `flex items-center gap-2 px-5 py-3 rounded-2xl whitespace-nowrap transition-all duration-300 flex-shrink-0 border font-bold text-sm shadow-sm snap-center group
                                 ${isActive
-                                    ? 'bg-indigo-500 text-white border-indigo-400/50 shadow-indigo-500/20 shadow-lg'
-                                    : 'bg-slate-900 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                                    ? 'bg-gradient-to-r from-indigo-500/20 to-indigo-600/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+                                    : 'bg-slate-900/50 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 hover:border-white/10'
                                 }`
                             }
                         >
-                            <Icon size={16} />
-                            {label}
+                            {({ isActive }) => (
+                                <>
+                                    <Icon size={16} className={`transition-colors duration-300 ${isActive ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                    {label}
+                                </>
+                            )}
                         </NavLink>
                     ))}
                 </div>
 
                 {/* Content Area */}
-                <div className="min-h-[500px]">
-                    <Outlet context={{ profile, setProfile }} />
+                <div className="min-h-[500px] relative">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={location.pathname}
+                            initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+                            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                            exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                            className="h-full"
+                        >
+                            <Outlet context={{ profile, setProfile }} />
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
             </div>
         </div>

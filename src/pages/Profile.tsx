@@ -46,136 +46,131 @@ interface EditViewProps {
 // ─── Dashboard View (STABLE TOP-LEVEL COMPONENT) ─────────────────────────────
 export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit }) => (
     <div className="space-y-8">
-        {/* Header / Hero Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-3xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-12 transition-transform group-hover:scale-125 duration-1000">
-                    <Zap size={200} className="text-indigo-400" />
-                </div>
-
-                <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-10">
-                    <div className="relative">
-                        <div className="w-40 h-40 rounded-[2rem] bg-gradient-to-br from-slate-800 to-slate-900 border-4 border-white/5 overflow-hidden shadow-2xl relative">
-                            {profile.photoURL ? (
-                                <img src={profile.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-900/50">
-                                    <User size={64} />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex-1 text-center md:text-left space-y-4 pt-2">
-                        <div>
-                            <h1 className="text-4xl font-black text-white tracking-tight mb-1">{profile.displayName || 'No Name Set'}</h1>
-                            <p className="text-indigo-400 font-bold tracking-wide uppercase text-xs flex items-center justify-center md:justify-start gap-2">
-                                <Building2 size={12} /> {profile.companyName || 'TaskMaster Ecosystem'}
-                            </p>
-                        </div>
-
-                        {/* ─── User Code ─────────────────── */}
-                        <div className="inline-flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl px-5 py-3">
-                            <div className="space-y-0.5">
-                                <p className="text-indigo-400 text-[9px] font-black uppercase tracking-[0.2em]">Your User Code</p>
-                                <p className="text-indigo-200 font-black text-2xl tracking-widest font-mono">
-                                    {profile.user_code || `TM-${''}`}
-                                </p>
-                                <p className="text-slate-500 text-[9px]">Share this to be added to team projects</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    if (profile.user_code) {
-                                        navigator.clipboard.writeText(profile.user_code);
-                                    }
-                                }}
-                                className="p-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded-xl text-indigo-300 transition-all"
-                                title="Copy code"
-                            >
-                                <ExternalLink size={16} />
-                            </button>
-                        </div>
-
-                        <p className="text-slate-400 text-sm leading-relaxed max-w-xl line-clamp-2 italic">
-                            "{profile.bio || 'Your bio will appear here. Tell us about yourself...'}"
-                        </p>
-
-
-                        <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                            <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
-                                <div className="p-1.5 bg-amber-500/20 rounded-lg"><Clock size={16} className="text-amber-400" /></div>
-                                <span className="text-slate-200 font-black">{stats.timeDelivered}h <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Logs</span></span>
-                            </div>
-                            <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
-                                <div className="p-1.5 bg-emerald-500/20 rounded-lg"><CheckCircle2 size={16} className="text-emerald-400" /></div>
-                                <span className="text-slate-200 font-black">{stats.completionRate}% <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Done</span></span>
-                            </div>
-                            {(profile.websites || []).map((url, i) => (
-                                <a key={i} href={url.startsWith('http') ? url : `https://${url}`} target="_blank" rel="noopener noreferrer"
-                                    className="bg-indigo-500/10 border border-indigo-500/20 px-5 py-2.5 rounded-2xl flex items-center gap-3 hover:bg-indigo-500/20 transition-all group">
-                                    <Globe size={16} className="text-indigo-400 group-hover:rotate-12 transition-transform" />
-                                    <span className="text-indigo-300 font-bold text-xs uppercase tracking-widest">{getHostname(url)}</span>
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={onEdit}
-                        className="bg-white text-slate-950 px-6 py-3 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all flex items-center gap-2 shadow-xl shadow-white/5 active:scale-95"
-                    >
-                        <Edit3 size={18} /> Edit Profile
-                    </button>
-                </div>
-
-                <div className="mt-12 space-y-4">
-                    <div className="flex justify-between items-end">
-                        <div className="space-y-1">
-                            <span className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Live Performance Index</span>
-                            <h3 className="text-white font-bold text-lg">Daily Productivity Level</h3>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-5xl font-black text-emerald-400">{stats.score}</span>
-                            <span className="text-slate-600 text-xl font-bold">/100</span>
-                        </div>
-                    </div>
-                    <div className="h-4 bg-slate-950 rounded-full border border-white/5 overflow-hidden p-1 shadow-inner">
-                        <div
-                            className="h-full bg-gradient-to-r from-indigo-500 via-emerald-500 to-emerald-400 rounded-full transition-all duration-1000 ease-out shadow-[0_0_25px_rgba(16,185,129,0.4)]"
-                            style={{ width: `${stats.score}%` }}
-                        />
-                    </div>
-                </div>
+        {/* Header / Hero Section — Full Width */}
+        <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 md:p-12 backdrop-blur-3xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-12 transition-transform group-hover:scale-125 duration-1000">
+                <Zap size={250} className="text-indigo-400" />
             </div>
 
-            {/* Digital Signature */}
-            <div className="space-y-6 flex flex-col">
-                <div className="flex-1 bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-3xl relative overflow-hidden flex flex-col">
-                    <h2 className="text-white font-black mb-6 flex items-center gap-3 text-lg">
-                        <div className="p-2 bg-indigo-500/20 rounded-xl"><FileSignature size={20} className="text-indigo-400" /></div>
-                        Digital Signature
-                    </h2>
-                    <div className="flex-1 aspect-square bg-slate-950/40 border-2 border-dashed border-slate-800 rounded-3xl flex items-center justify-center p-6 mb-4 group transition-colors hover:border-indigo-500/30">
-                        {profile.signatureURL ? (
-                            <img src={profile.signatureURL} alt="Signature" className="max-h-full max-w-full object-contain invert" />
+            <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-10">
+                <div className="relative">
+                    <div className="w-40 h-40 rounded-[2rem] bg-gradient-to-br from-slate-800 to-slate-900 border-4 border-white/5 overflow-hidden shadow-2xl relative">
+                        {profile.photoURL ? (
+                            <img src={profile.photoURL} alt="Avatar" className="w-full h-full object-cover" />
                         ) : (
-                            <div className="text-center space-y-3 opacity-30">
-                                <FileSignature size={48} className="mx-auto text-slate-500" />
-                                <p className="text-xs text-slate-400 font-medium">No signature configured</p>
+                            <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-900/50">
+                                <User size={64} />
                             </div>
                         )}
                     </div>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center leading-relaxed italic">
-                        Used automatically for professional <br />invoice &amp; report exports.
+                </div>
+
+                <div className="flex-1 text-center md:text-left space-y-4 pt-2">
+                    <div>
+                        <h1 className="text-4xl font-black text-white tracking-tight mb-1">{profile.displayName || 'No Name Set'}</h1>
+                        <p className="text-indigo-400 font-bold tracking-wide uppercase text-xs flex items-center justify-center md:justify-start gap-2">
+                            <Building2 size={12} /> {profile.companyName || 'TaskMaster Ecosystem'}
+                        </p>
+                    </div>
+
+                    {/* ─── User Code ─────────────────── */}
+                    <div className="inline-flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl px-5 py-3">
+                        <div className="space-y-0.5">
+                            <p className="text-indigo-400 text-[9px] font-black uppercase tracking-[0.2em]">Your User Code</p>
+                            <p className="text-indigo-200 font-black text-2xl tracking-widest font-mono">
+                                {profile.user_code || `TM-${''}`}
+                            </p>
+                            <p className="text-slate-500 text-[9px]">Share this to be added to team projects</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                if (profile.user_code) {
+                                    navigator.clipboard.writeText(profile.user_code);
+                                }
+                            }}
+                            className="p-2 bg-indigo-500/20 hover:bg-indigo-500/40 rounded-xl text-indigo-300 transition-all"
+                            title="Copy code"
+                        >
+                            <ExternalLink size={16} />
+                        </button>
+                    </div>
+
+                    <p className="text-slate-400 text-sm leading-relaxed max-w-xl line-clamp-2 italic">
+                        "{profile.bio || 'Your bio will appear here. Tell us about yourself...'}"
                     </p>
+
+                    <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                        <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
+                            <div className="p-1.5 bg-amber-500/20 rounded-lg"><Clock size={16} className="text-amber-400" /></div>
+                            <span className="text-slate-200 font-black">{stats.timeDelivered}h <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Logs</span></span>
+                        </div>
+                        <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
+                            <div className="p-1.5 bg-emerald-500/20 rounded-lg"><CheckCircle2 size={16} className="text-emerald-400" /></div>
+                            <span className="text-slate-200 font-black">{stats.completionRate}% <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Done</span></span>
+                        </div>
+                        {(profile.websites || []).map((url, i) => (
+                            <a key={i} href={url.startsWith('http') ? url : `https://${url}`} target="_blank" rel="noopener noreferrer"
+                                className="bg-indigo-500/10 border border-indigo-500/20 px-5 py-2.5 rounded-2xl flex items-center gap-3 hover:bg-indigo-500/20 transition-all group">
+                                <Globe size={16} className="text-indigo-400 group-hover:rotate-12 transition-transform" />
+                                <span className="text-indigo-300 font-bold text-xs uppercase tracking-widest">{getHostname(url)}</span>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+
+                <button
+                    onClick={onEdit}
+                    className="bg-white text-slate-950 px-6 py-3 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all flex items-center gap-2 shadow-xl shadow-white/5 active:scale-95"
+                >
+                    <Edit3 size={18} /> Edit Profile
+                </button>
+            </div>
+
+            <div className="mt-12 space-y-4">
+                <div className="flex justify-between items-end">
+                    <div className="space-y-1">
+                        <span className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Live Performance Index</span>
+                        <h3 className="text-white font-bold text-lg">Daily Productivity Level</h3>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-5xl font-black text-emerald-400">{stats.score}</span>
+                        <span className="text-slate-600 text-xl font-bold">/100</span>
+                    </div>
+                </div>
+                <div className="h-4 bg-slate-950 rounded-full border border-white/5 overflow-hidden p-1 shadow-inner">
+                    <div
+                        className="h-full bg-gradient-to-r from-indigo-500 via-emerald-500 to-emerald-400 rounded-full transition-all duration-1000 ease-out shadow-[0_0_25px_rgba(16,185,129,0.4)]"
+                        style={{ width: `${stats.score}%` }}
+                    />
                 </div>
             </div>
         </div>
 
-        {/* Bottom Row: Company Info & Team */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Bottom Row: Signature & Company Info — Side by Side */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            {/* Digital Signature */}
+            <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 backdrop-blur-3xl relative overflow-hidden flex flex-col hover:border-indigo-500/20 transition-all duration-300">
+                <h2 className="text-white font-black mb-6 flex items-center gap-3 text-lg">
+                    <div className="p-2 bg-indigo-500/20 rounded-xl"><FileSignature size={20} className="text-indigo-400" /></div>
+                    Digital Signature
+                </h2>
+                <div className="bg-slate-950/40 border-2 border-dashed border-slate-800 rounded-3xl flex items-center justify-center p-6 mb-4 group transition-colors hover:border-indigo-500/30 max-h-[200px]">
+                    {profile.signatureURL ? (
+                        <img src={profile.signatureURL} alt="Signature" className="max-h-full max-w-full object-contain invert" />
+                    ) : (
+                        <div className="text-center space-y-3 opacity-30">
+                            <FileSignature size={48} className="mx-auto text-slate-500" />
+                            <p className="text-xs text-slate-400 font-medium">No signature configured</p>
+                        </div>
+                    )}
+                </div>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center leading-relaxed italic mt-auto">
+                    Used automatically for professional <br />invoice &amp; report exports.
+                </p>
+            </div>
+
             {/* Company & Details */}
-            <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-3xl space-y-8">
+            <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-3xl space-y-8 flex flex-col hover:border-indigo-500/20 transition-all duration-300">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-indigo-500/20 rounded-2xl"><Building2 size={24} className="text-indigo-400" /></div>
                     <div>
@@ -226,7 +221,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, on
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 );

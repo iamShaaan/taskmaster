@@ -125,9 +125,9 @@ export const ArchivePage: React.FC = () => {
                     <button
                         key={col}
                         onClick={() => setFilter(col)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize ${filter === col
-                                ? 'bg-indigo-500 text-white'
-                                : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+                        className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all duration-300 capitalize border ${filter === col
+                            ? 'bg-gradient-to-r from-indigo-500/20 to-indigo-600/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+                            : 'bg-slate-900/50 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 hover:border-white/10'
                             }`}
                     >
                         {col === 'all' ? `All (${items.length})` : `${LABEL_MAP[col]}s (${items.filter(i => i.deleted_from === col).length})`}
