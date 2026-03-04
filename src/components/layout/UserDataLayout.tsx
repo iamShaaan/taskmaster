@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Users, FileText, HardDrive, Archive, Key } from 'lucide-react';
+import { Outlet, NavLink } from 'react-router-dom';
+import { Users, FileText, HardDrive, Archive } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { db, APP_ID } from '../../firebase/config';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,7 +22,6 @@ const navItems = [
 export const UserDataLayout: React.FC = () => {
     const { user } = useAuth();
     const { tasks, projects, meetings } = useAppStore();
-    const location = useLocation();
 
     // Profile State
     const [loading, setLoading] = useState(true);
