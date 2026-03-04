@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, Tag, FolderKanban, Users, UserCircle, AlignLeft, Activity } from 'lucide-react';
 import type { Task } from '../../types';
@@ -16,9 +17,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
     const clientName = task.client_id ? clients.find(c => c.id === task.client_id)?.name : null;
     const projectName = task.project_id ? projects.find(p => p.id === task.project_id)?.name : null;
 
-    return (
+    if (typeof document === 'undefined') return null;
+
+    return createPortal(
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
                 {/* Backdrop */}
                 <motion.div
                     initial={{ opacity: 0 }}
@@ -37,8 +40,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
                 >
                     {/* Header Strip */}
                     <div className={`h-2 w-full ${task.status === 'done' ? 'bg-emerald-500' :
-                            task.status === 'in_progress' ? 'bg-indigo-500' :
-                                task.status === 'error' ? 'bg-red-500' : 'bg-slate-600'
+                        task.status === 'in_progress' ? 'bg-indigo-500' :
+                            task.status === 'error' ? 'bg-red-500' : 'bg-slate-600'
                         }`} />
 
                     {/* Header Content */}
@@ -152,6 +155,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
                     </div>
                 </motion.div>
             </div>
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
