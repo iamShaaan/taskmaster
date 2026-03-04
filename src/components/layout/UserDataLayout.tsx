@@ -60,6 +60,14 @@ export const UserDataLayout: React.FC = () => {
                     data.user_code = user_code;
                 }
                 setProfile(data);
+
+                // Proactively sync Firestore name → Auth if they differ
+                if (data.displayName && data.displayName !== user!.displayName) {
+                    updateProfile(user!, {
+                        displayName: data.displayName,
+                        ...(data.photoURL ? { photoURL: data.photoURL } : {}),
+                    }).catch(() => { /* silent — non-critical */ });
+                }
             } else {
                 const user_code = `TM-${user!.uid.substring(0, 6).toUpperCase()}`;
                 setProfile({
