@@ -379,14 +379,45 @@ const ROLE_CONFIG = {
 };
 
 const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
-    const [emailLabel, setEmailLabel] = useState('');
     const [userCode, setUserCode] = useState('');
     const [role, setRole] = useState<'admin' | 'moderator' | 'viewer'>('moderator');
     const [adding, setAdding] = useState(false);
+    const [savedTeam, setSavedTeam] = useState<{ name: string; email: string; user_code: string; uid?: string }[]>([]);
+    const [selectedMember, setSelectedMember] = useState('');
     const isOwner = auth.currentUser?.uid === project.owner_id;
 
+    // Fetch saved team members from user profile
+    React.useEffect(() => {
+        const loadTeam = async () => {
+            if (!auth.currentUser) return;
+            const { doc, getDoc } = await import('firebase/firestore');
+            const { db, APP_ID } = await import('../firebase/config');
+            try {
+                const snap = await getDoc(doc(db, `apps/${APP_ID}/users`, auth.currentUser.uid));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    setSavedTeam(data.teamMembers || []);
+                }
+            } catch { /* silent */ }
+        };
+        loadTeam();
+    }, []);
+
+    const handleSelectMember = (value: string) => {
+        setSelectedMember(value);
+        if (value === '__manual__' || value === '') {
+            setUserCode('');
+            return;
+        }
+        // Find the team member and auto-fill their code
+        const member = savedTeam.find(m => m.user_code === value || m.email === value);
+        if (member) {
+            setUserCode(member.user_code || '');
+        }
+    };
+
     const handleAddMember = async () => {
-        if (!userCode.trim()) { toast.error('Enter a User Code'); return; }
+        if (!userCode.trim()) { toast.error('Enter a User Code or select a team member'); return; }
         setAdding(true);
         try {
             const { searchByUserCode, updateDocById: update } = await import('../firebase/firestore');
@@ -397,15 +428,20 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
             if (targetUid === project.owner_id) { toast.error('That user is already the project owner'); return; }
             const existing: string[] = project.member_uids || project.shared_with || [];
             if (existing.includes(targetUid)) { toast.error('This user is already a team member'); return; }
-            const newMember = { uid: targetUid, email: emailLabel.trim() || found.email || '', role, added_at: new Date() };
+
+            // Get email from selected member or from found user
+            const selectedTeamMember = savedTeam.find(m => m.user_code === userCode.trim());
+            const emailLabel = selectedTeamMember?.email || found.email || '';
+
+            const newMember = { uid: targetUid, email: emailLabel, role, added_at: new Date() };
             const updatedMembers = [...(project.members || []), newMember];
             const updatedMemberUids = [...existing, targetUid];
             const updatedAdminUids = role === 'admin' ? [...(project.admin_uids || []), targetUid] : (project.admin_uids || []);
             const updatedModeratorUids = role === 'moderator' ? [...(project.moderator_uids || []), targetUid] : (project.moderator_uids || []);
             const updatedViewerUids = role === 'viewer' ? [...(project.viewer_uids || []), targetUid] : (project.viewer_uids || []);
             await update('projects', project.id, { members: updatedMembers, member_uids: updatedMemberUids, admin_uids: updatedAdminUids, moderator_uids: updatedModeratorUids, viewer_uids: updatedViewerUids });
-            setEmailLabel(''); setUserCode('');
-            toast.success(`Added ${found.displayName || found.email || 'member'} as ${role}`);
+            setUserCode(''); setSelectedMember('');
+            toast.success(`Added ${found.displayName || emailLabel || 'member'} as ${role}`);
         } catch (err) {
             console.error(err);
             toast.error('Failed to add member');
@@ -431,6 +467,8 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
     };
 
     const members = project.members || [];
+    const existingUids = new Set([project.owner_id, ...(project.member_uids || [])]);
+    const availableTeam = savedTeam.filter(m => !existingUids.has(m.uid || ''));
 
     return (
         <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6">
@@ -440,11 +478,38 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
 
             {isOwner && (
                 <div className="mb-6 space-y-3 p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Add Member by User Code</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <input type="email" value={emailLabel} onChange={(e) => setEmailLabel(e.target.value)} placeholder="Email (label only)" className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all" />
-                        <input type="text" value={userCode} onChange={(e) => setUserCode(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && handleAddMember()} placeholder="TM-XXXXXX (User Code)" className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-all" />
-                    </div>
+                    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Add Team Member</p>
+
+                    {/* Team Member Dropdown */}
+                    <select
+                        value={selectedMember}
+                        onChange={(e) => handleSelectMember(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
+                    >
+                        <option value="">Select from your team directory…</option>
+                        {availableTeam.map((m, i) => (
+                            <option key={i} value={m.user_code || m.email}>
+                                {m.name || m.email || m.user_code} {m.user_code ? `(${m.user_code})` : ''} {m.email ? `— ${m.email}` : ''}
+                            </option>
+                        ))}
+                        {availableTeam.length === 0 && (
+                            <option disabled>No available team members</option>
+                        )}
+                        <option value="__manual__">✎ Enter User Code manually…</option>
+                    </select>
+
+                    {/* Manual Code Input — shown when "manual" is selected or no dropdown match */}
+                    {(selectedMember === '__manual__' || (selectedMember === '' && userCode)) && (
+                        <input
+                            type="text"
+                            value={userCode}
+                            onChange={(e) => setUserCode(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
+                            placeholder="TM-XXXXXX (User Code)"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-all"
+                        />
+                    )}
+
                     <div className="flex gap-2">
                         <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'moderator' | 'viewer')} className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-all">
                             <option value="admin">Admin — Full control</option>
@@ -455,7 +520,6 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
                             {adding ? '...' : 'Add'}
                         </button>
                     </div>
-                    <p className="text-slate-600 text-[10px]">The member's User Code is shown on their Profile page.</p>
                 </div>
             )}
 
