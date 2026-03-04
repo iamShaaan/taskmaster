@@ -27,6 +27,10 @@ export interface Task {
     tags: string[];
     owner_id: string;
     completed_at?: Date;
+    assignee_id?: string | null;
+    assignee_name?: string | null;
+    assignee_email?: string | null;
+    project_member_uids?: string[];
 }
 
 export interface TimeLog {
@@ -126,7 +130,7 @@ export interface UserProfile {
     bio?: string;
     companyName?: string;
     companyDescription?: string;
-    teamMembers?: { email: string; phone?: string; }[];
+    teamMembers?: { uid?: string; user_code?: string; name?: string; email: string; phone?: string; }[];
     productivityScore?: number;
     lastCalculated?: Date;
 }

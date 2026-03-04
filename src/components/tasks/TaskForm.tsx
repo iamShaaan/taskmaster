@@ -3,7 +3,7 @@ import { useAppStore } from '../../store';
 import { createDoc, updateDocById } from '../../firebase/firestore';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
-import { X, Plus, Tag, Users, FolderKanban } from 'lucide-react';
+import { X, Plus, Tag, Users, FolderKanban, UserCircle } from 'lucide-react';
 
 interface TaskFormProps {
     onClose: () => void;
@@ -26,6 +26,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
         due_date: editTask?.due_date ? editTask.due_date.toISOString().slice(0, 16) : '',
         project_id: editTask?.project_id || '',
         client_id: editTask?.client_id || '',
+        assignee_id: editTask?.assignee_id || '',
         tags: editTask?.tags || [] as string[],
     });
 
@@ -49,6 +50,21 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
         [form.client_id, projects]
     );
 
+    const projectMembers = useMemo(() => {
+        if (!form.project_id) return [];
+        const proj = projects.find(p => p.id === form.project_id);
+        if (!proj) return [];
+        return proj.members || [];
+    }, [form.project_id, projects]);
+
+    const handleProjectChange = (projectId: string) => {
+        setForm(f => {
+            const proj = projects.find(p => p.id === projectId);
+            const isValidAssignee = proj?.members?.some(m => m.uid === f.assignee_id);
+            return { ...f, project_id: projectId, assignee_id: isValidAssignee ? f.assignee_id : '' };
+        });
+    };
+
     const set = (k: string, v: string | string[]) => setForm((f) => ({ ...f, [k]: v }));
 
     const addTag = () => {
@@ -65,8 +81,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
         if (!form.title.trim()) { toast.error('Title is required'); return; }
         setLoading(true);
         try {
+            const proj = projects.find(p => p.id === form.project_id);
+            const selectedAssignee = proj?.members?.find(m => m.uid === form.assignee_id);
             const data = {
                 ...form,
+                assignee_id: form.assignee_id || null,
+                assignee_email: selectedAssignee ? selectedAssignee.email : null,
+                project_member_uids: proj ? proj.member_uids : [],
                 due_date: form.due_date ? new Date(form.due_date) : null,
                 project_id: form.project_id || null,
                 client_id: form.client_id || null,
@@ -159,7 +180,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
                     <select
                         className={inputCls}
                         value={form.project_id}
-                        onChange={(e) => set('project_id', e.target.value)}
+                        onChange={(e) => handleProjectChange(e.target.value)}
                         disabled={filteredProjects.length === 0}
                     >
                         <option value="">— No project —</option>
@@ -171,10 +192,28 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
                 </div>
             </div>
 
-            {/* Due Date */}
-            <div>
-                <label className={labelCls}>Due Date</label>
-                <input type="datetime-local" className={inputCls} value={form.due_date} onChange={(e) => set('due_date', e.target.value)} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Due Date */}
+                <div>
+                    <label className={labelCls}>Due Date</label>
+                    <input type="datetime-local" className={inputCls} value={form.due_date} onChange={(e) => set('due_date', e.target.value)} />
+                </div>
+
+                {/* Assignee */}
+                <div>
+                    <label className={labelCls}>
+                        <span className="flex items-center gap-1"><UserCircle size={11} /> Assignee</span>
+                    </label>
+                    <select
+                        className={inputCls}
+                        value={form.assignee_id}
+                        onChange={(e) => set('assignee_id', e.target.value)}
+                        disabled={!form.project_id || projectMembers.length === 0}
+                    >
+                        <option value="">— Unassigned —</option>
+                        {projectMembers.map((m) => <option key={m.uid} value={m.uid}>{m.email}</option>)}
+                    </select>
+                </div>
             </div>
 
             {/* Tags */}

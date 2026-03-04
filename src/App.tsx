@@ -29,19 +29,42 @@ const DataLoader: React.FC = () => {
     if (!user) return;
     const unsubs: (() => void)[] = [];
 
-    // Personal items: Filter by owner_id
-    unsubs.push(listenCollection('tasks', (data) => {
-      setTasks(data.filter(d => !d.deleted_at).map((d) => ({
+    // Tasks state holder to merge multiple listeners without duplicate/stale issues
+    const tasksState = { owned: [] as any[], assigned: [] as any[], shared: [] as any[] };
+    const updateTasks = () => {
+      const merged = [...tasksState.owned, ...tasksState.assigned, ...tasksState.shared];
+      const unique = merged.filter((t, i, a) => a.findIndex(x => x.id === t.id) === i)
+        .sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0));
+
+      setTasks(unique.map((d) => ({
         ...d,
-        due_date: toDate(d.due_date as never),
-        created_at: toDate(d.created_at as never) || new Date(),
-        time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
-          start: toDate(l.start as never) || new Date(),
-          end: toDate(l.end as never) || new Date(),
+        due_date: toDate(d.due_date),
+        created_at: toDate(d.created_at) || new Date(),
+        time_logs: (d.time_logs || []).map((l: any) => ({
+          start: toDate(l.start) || new Date(),
+          end: toDate(l.end) || new Date(),
           duration_ms: l.duration_ms as number,
         })),
       } as unknown as Task)));
+    };
+
+    // Personal items: Filter by owner_id
+    unsubs.push(listenCollection('tasks', (data) => {
+      tasksState.owned = data.filter(d => !d.deleted_at);
+      updateTasks();
     }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
+
+    // Assigned tasks
+    unsubs.push(listenCollection('tasks', (data) => {
+      tasksState.assigned = data.filter(d => !d.deleted_at);
+      updateTasks();
+    }, where('assignee_id', '==', user.uid), orderBy('created_at', 'desc')));
+
+    // Shared project tasks
+    unsubs.push(listenCollection('tasks', (data) => {
+      tasksState.shared = data.filter(d => !d.deleted_at);
+      updateTasks();
+    }, where('project_member_uids', 'array-contains', user.uid), orderBy('created_at', 'desc')));
 
     unsubs.push(listenCollection('meetings', (data) => {
       setMeetings(data.filter(d => !d.deleted_at).map((d) => ({

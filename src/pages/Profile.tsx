@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { db, APP_ID, storage } from '../firebase/config';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { searchByUserCode } from '../firebase/firestore';
 import {
     User, Globe, Building2,
     Zap, Clock, CheckCircle2, Camera, FileSignature, Save, Loader2,
@@ -39,8 +40,8 @@ interface DashboardViewProps {
 interface EditViewProps {
     profile: Partial<UserProfile>;
     setProfile: React.Dispatch<React.SetStateAction<Partial<UserProfile>>>;
-    newMemberEmail: string;
-    setNewMemberEmail: React.Dispatch<React.SetStateAction<string>>;
+    newMemberCode: string;
+    setNewMemberCode: React.Dispatch<React.SetStateAction<string>>;
     newPortfolioUrl: string;
     setNewPortfolioUrl: React.Dispatch<React.SetStateAction<string>>;
     saving: boolean;
@@ -265,8 +266,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
                                     {member.email.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-white text-sm font-bold truncate">{member.email}</p>
-                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Member</p>
+                                    <p className="text-white text-sm font-bold truncate">{member.name || member.email || member.user_code}</p>
+                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{member.user_code ? `Code: ${member.user_code}` : 'Active Member'}</p>
                                 </div>
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"><Mail size={14} /></button>
@@ -289,7 +290,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit })
 
 // ─── Edit View (STABLE TOP-LEVEL COMPONENT) ───────────────────────────────────
 const EditView: React.FC<EditViewProps> = ({
-    profile, setProfile, newMemberEmail, setNewMemberEmail,
+    profile, setProfile, newMemberCode, setNewMemberCode,
     newPortfolioUrl, setNewPortfolioUrl,
     saving, onSave, onDiscard, onFileUpload, onAddMember, onRemoveMember,
     onAddPortfolio, onRemovePortfolio
@@ -477,9 +478,9 @@ const EditView: React.FC<EditViewProps> = ({
                                 <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
                                 <input
                                     className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 pl-12 text-white outline-none focus:border-indigo-500/50 transition-all font-bold"
-                                    placeholder="Add member by email..."
-                                    value={newMemberEmail}
-                                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                                    placeholder="Add member by their User Code (e.g. TM-A3X9P2)..."
+                                    value={newMemberCode}
+                                    onChange={(e) => setNewMemberCode(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), onAddMember())}
                                 />
                             </div>
@@ -498,10 +499,10 @@ const EditView: React.FC<EditViewProps> = ({
                                         <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold text-xs">
                                             {member.email.charAt(0).toUpperCase()}
                                         </div>
-                                        <span className="text-slate-200 text-xs font-bold truncate max-w-[150px]">{member.email}</span>
+                                        <span className="text-slate-200 text-xs font-bold truncate max-w-[150px]">{member.name || member.email || member.user_code}</span>
                                     </div>
                                     <button
-                                        onClick={() => onRemoveMember(member.email)}
+                                        onClick={() => onRemoveMember(member.email || member.user_code || '')}
                                         className="p-2 text-slate-600 hover:text-red-400 transition-colors"
                                     >
                                         <X size={16} />
@@ -524,7 +525,7 @@ export const Profile: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [profile, setProfile] = useState<Partial<UserProfile>>({});
-    const [newMemberEmail, setNewMemberEmail] = useState('');
+    const [newMemberCode, setNewMemberCode] = useState('');
     const [newPortfolioUrl, setNewPortfolioUrl] = useState('');
 
     const [stats, setStats] = useState({
@@ -635,24 +636,51 @@ export const Profile: React.FC = () => {
         }
     };
 
-    const addTeamMember = () => {
-        if (!newMemberEmail.trim()) return;
-        const email = newMemberEmail.trim().toLowerCase();
-        if (profile.teamMembers?.some(m => m.email === email)) {
+    const addTeamMember = async () => {
+        if (!newMemberCode.trim()) return;
+        const codeToFind = newMemberCode.trim().toUpperCase();
+
+        // Don't add self
+        if (codeToFind === profile.user_code) {
+            toast.error("You cannot add yourself.");
+            return;
+        }
+
+        if (profile.teamMembers?.some(m => m.user_code === codeToFind)) {
             toast.error('Member already added');
             return;
         }
-        setProfile(p => ({
-            ...p,
-            teamMembers: [...(p.teamMembers || []), { email }]
-        }));
-        setNewMemberEmail('');
+
+        toast.loading("Searching for user...", { id: "search-user" });
+        try {
+            const users = await searchByUserCode(codeToFind);
+            if (users.length === 0) {
+                toast.error("No user found with that code.", { id: "search-user" });
+                return;
+            }
+            const foundUser = users[0];
+
+            setProfile(p => ({
+                ...p,
+                teamMembers: [...(p.teamMembers || []), {
+                    uid: foundUser.uid || foundUser.id,
+                    user_code: foundUser.user_code,
+                    name: foundUser.displayName || foundUser.fullName || '',
+                    email: foundUser.professionalEmail || foundUser.personalEmail || ''
+                }]
+            }));
+            setNewMemberCode('');
+            toast.success("Team member added!", { id: "search-user" });
+        } catch (e) {
+            toast.error("Failed to add user.", { id: "search-user" });
+            console.error(e);
+        }
     };
 
-    const removeTeamMember = (email: string) => {
+    const removeTeamMember = (identifier: string) => {
         setProfile(p => ({
             ...p,
-            teamMembers: p.teamMembers?.filter(m => m.email !== email) || []
+            teamMembers: p.teamMembers?.filter(m => (m.user_code !== identifier && m.email !== identifier)) || []
         }));
     };
 
@@ -683,8 +711,8 @@ export const Profile: React.FC = () => {
                 <EditView
                     profile={profile}
                     setProfile={setProfile}
-                    newMemberEmail={newMemberEmail}
-                    setNewMemberEmail={setNewMemberEmail}
+                    newMemberCode={newMemberCode}
+                    setNewMemberCode={setNewMemberCode}
                     newPortfolioUrl={newPortfolioUrl}
                     setNewPortfolioUrl={setNewPortfolioUrl}
                     saving={saving}

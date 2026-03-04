@@ -9,6 +9,7 @@ import { deleteDocById, updateDocById } from '../../firebase/firestore';
 import { auth } from '../../firebase/config';
 import { useAppStore } from '../../store';
 import toast from 'react-hot-toast';
+import { TaskDetailsModal } from './TaskDetailsModal';
 
 interface TaskCardProps {
     task: Task;
@@ -26,6 +27,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
     );
     const overdue = task.due_date ? isOverdue(task.due_date) && task.status !== 'done' : false;
     const [deleting, setDeleting] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
 
     // Resolve client and project names from store
     const { clients, projects } = useAppStore();
@@ -70,9 +72,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
             {/* Header */}
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1">
-                    <h3 className="text-slate-50 font-semibold text-sm leading-relaxed line-clamp-2 group-hover:text-indigo-300 transition-colors">
+                    <button
+                        onClick={() => setShowDetails(true)}
+                        className="text-slate-50 font-semibold text-sm leading-relaxed line-clamp-2 hover:text-indigo-400 hover:underline transition-colors text-left"
+                    >
                         {task.title}
-                    </h3>
+                    </button>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                     <button onClick={() => onEdit(task)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
@@ -149,6 +154,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                     {isRunning ? 'STOP' : 'START'}
                 </button>
             </div>
+            {showDetails && <TaskDetailsModal task={task} onClose={() => setShowDetails(false)} />}
         </motion.div>
     );
 };
