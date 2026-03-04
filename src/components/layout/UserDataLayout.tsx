@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { db, APP_ID } from '../../firebase/config';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { updateProfile } from 'firebase/auth';
 import { useAppStore } from '../../store';
 import { DashboardView, EditView } from '../../pages/Profile'; // we'll modify Profile to export these
 import type { UserProfile } from '../../types';
@@ -103,12 +104,20 @@ export const UserDataLayout: React.FC = () => {
         if (!user) return;
         setSaving(true);
         try {
+            // Save to Firestore
             await setDoc(doc(db, `apps/${APP_ID}/users`, user.uid), {
                 ...profile,
                 productivityScore: stats.score,
                 lastCalculated: serverTimestamp(),
                 updated_at: serverTimestamp()
             }, { merge: true });
+
+            // Sync displayName & photoURL to Firebase Auth so it persists across redeploys
+            await updateProfile(user, {
+                displayName: profile.displayName || user.displayName || null,
+                photoURL: profile.photoURL || user.photoURL || null,
+            });
+
             toast.success('Profile updated successfully');
             setIsEditing(false);
         } catch {
