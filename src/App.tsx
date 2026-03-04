@@ -95,32 +95,33 @@ const DataLoader: React.FC = () => {
     // However, we can use a simpler approach: fetch where owner OR fetch where shared_with (though onSnapshot is per-query).
     // Alternative: Just fetch everything and filter in-memory if team size is small, OR do two separate listeners.
     // For now, let's use the 'shared_with' if we can, or just implement the ownership for now and then add sharing.
-    // First listener: projects owned by user
-    unsubs.push(listenCollection('projects', (data) => {
-      setProjects(data.filter(d => !d.deleted_at).map((d) => ({
+    // Projects state holder
+    const projectsState = { owned: [] as any[], shared: [] as any[] };
+    const updateProjects = () => {
+      const merged = [...projectsState.owned, ...projectsState.shared];
+      const unique = merged.filter((p, i, a) => a.findIndex(x => x.id === p.id) === i);
+
+      setProjects(unique.map((d) => ({
         ...d,
-        created_at: toDate(d.created_at as never) || new Date(),
-        time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
-          start: toDate(l.start as never) || new Date(),
-          end: toDate(l.end as never) || new Date(),
+        created_at: toDate(d.created_at) || new Date(),
+        time_logs: ((d.time_logs as any[]) || []).map((l: any) => ({
+          start: toDate(l.start) || new Date(),
+          end: toDate(l.end) || new Date(),
           duration_ms: l.duration_ms as number,
         })),
       } as unknown as Project)));
+    };
+
+    // First listener: projects owned by user
+    unsubs.push(listenCollection('projects', (data) => {
+      projectsState.owned = data.filter(d => !d.deleted_at);
+      updateProjects();
     }, where('owner_id', '==', user.uid)));
 
     // Second listener: projects shared with this user (member_uids array-contains)
     unsubs.push(listenCollection('projects', (data) => {
-      const sharedProjects = data.filter(d => !d.deleted_at).map((d) => ({
-        ...d,
-        created_at: toDate(d.created_at as never) || new Date(),
-        time_logs: ((d.time_logs as never[]) || []).map((l: Record<string, unknown>) => ({
-          start: toDate(l.start as never) || new Date(),
-          end: toDate(l.end as never) || new Date(),
-          duration_ms: l.duration_ms as number,
-        })),
-      } as unknown as Project));
-
-      setProjects([...useAppStore.getState().projects, ...sharedProjects].filter((p, i, a) => a.findIndex(t => t.id === p.id) === i));
+      projectsState.shared = data.filter(d => !d.deleted_at);
+      updateProjects();
     }, where('member_uids', 'array-contains', user.uid)));
 
     return () => unsubs.forEach((u) => u());

@@ -18,8 +18,17 @@ export const TeamMembers: React.FC = () => {
     const [userCode, setUserCode] = useState('');
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
+    const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
-    const addTeamMember = async () => {
+    const resetForm = () => {
+        setName('');
+        setEmail('');
+        setUserCode('');
+        setShowForm(false);
+        setEditingIdx(null);
+    };
+
+    const saveTeamMember = async () => {
         if (!name.trim() && !email.trim() && !userCode.trim()) {
             toast.error('Please fill in at least one field');
             return;
@@ -29,12 +38,15 @@ export const TeamMembers: React.FC = () => {
         const trimmedCode = userCode.trim().toUpperCase();
         const trimmedName = name.trim();
 
-        // Duplicate check
-        if (profile.teamMembers?.some(m =>
-            (trimmedEmail && m.email?.toLowerCase() === trimmedEmail) ||
-            (trimmedCode && m.user_code === trimmedCode)
-        )) {
-            toast.error('This member is already in your team');
+        // Duplicate check (exclude current if editing)
+        const isDuplicate = profile.teamMembers?.some((m, idx) => {
+            if (editingIdx === idx) return false;
+            return (trimmedEmail && m.email?.toLowerCase() === trimmedEmail) ||
+                (trimmedCode && m.user_code === trimmedCode);
+        });
+
+        if (isDuplicate) {
+            toast.error('This member matching this email or code already exists');
             return;
         }
 
@@ -46,13 +58,18 @@ export const TeamMembers: React.FC = () => {
 
         setSaving(true);
         try {
-            const newMember = {
+            const memberData = {
                 name: trimmedName,
                 email: trimmedEmail,
                 user_code: trimmedCode,
             };
 
-            const newMembers = [...(profile.teamMembers || []), newMember];
+            let newMembers = [...(profile.teamMembers || [])];
+            if (editingIdx !== null) {
+                newMembers[editingIdx] = memberData;
+            } else {
+                newMembers.push(memberData);
+            }
 
             if (profile.uid) {
                 await setDoc(doc(db, `apps/${APP_ID}/users`, profile.uid), {
@@ -61,17 +78,24 @@ export const TeamMembers: React.FC = () => {
             }
 
             setProfile(p => ({ ...p, teamMembers: newMembers }));
-            setName('');
-            setEmail('');
-            setUserCode('');
-            setShowForm(false);
-            toast.success('Team member added!');
+            resetForm();
+            toast.success(editingIdx !== null ? 'Member updated!' : 'Team member added!');
         } catch (e) {
-            toast.error('Failed to add member');
+            toast.error('Failed to save member');
             console.error(e);
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleEdit = (idx: number) => {
+        const member = (profile.teamMembers || [])[idx];
+        if (!member) return;
+        setName(member.name || '');
+        setEmail(member.email || '');
+        setUserCode(member.user_code || '');
+        setEditingIdx(idx);
+        setShowForm(true);
     };
 
     const removeTeamMember = async (idx: number) => {
@@ -105,7 +129,7 @@ export const TeamMembers: React.FC = () => {
                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Manage your team members</p>
                 </div>
                 <button
-                    onClick={() => setShowForm(!showForm)}
+                    onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}
                     className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center gap-2 text-sm"
                 >
                     <UserPlus size={16} />
@@ -118,7 +142,7 @@ export const TeamMembers: React.FC = () => {
                 <div className="bg-slate-950/60 border border-white/5 rounded-3xl p-6 space-y-4 animate-in fade-in slide-in-from-top-2">
                     <h3 className="text-white font-bold text-sm flex items-center gap-2">
                         <UserPlus size={14} className="text-emerald-400" />
-                        Add New Team Member
+                        {editingIdx !== null ? 'Edit Team Member' : 'Add New Team Member'}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="relative">
@@ -147,17 +171,17 @@ export const TeamMembers: React.FC = () => {
                                 placeholder="User ID (e.g. TM-A3X9P2)"
                                 value={userCode}
                                 onChange={(e) => setUserCode(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTeamMember(); } }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveTeamMember(); } }}
                             />
                         </div>
                     </div>
                     <div className="flex justify-end">
                         <button
-                            onClick={addTeamMember}
+                            onClick={saveTeamMember}
                             disabled={saving || (!name.trim() && !email.trim() && !userCode.trim())}
                             className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-sm flex items-center gap-2"
                         >
-                            {saving ? 'Saving...' : 'Save Member'}
+                            {saving ? 'Saving...' : (editingIdx !== null ? 'Update Member' : 'Save Member')}
                         </button>
                     </div>
                 </div>
@@ -200,12 +224,22 @@ export const TeamMembers: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => removeTeamMember(idx)}
-                                    className="p-2 bg-slate-900 border border-white/5 rounded-xl text-slate-600 hover:text-red-400 hover:border-red-500/30 transition-all"
-                                >
-                                    <X size={16} />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleEdit(idx)}
+                                        className="p-2 bg-slate-900 border border-white/5 rounded-xl text-slate-600 hover:text-indigo-400 hover:border-indigo-500/30 transition-all"
+                                        title="Edit member"
+                                    >
+                                        <Users size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => removeTeamMember(idx)}
+                                        className="p-2 bg-slate-900 border border-white/5 rounded-xl text-slate-600 hover:text-red-400 hover:border-red-500/30 transition-all"
+                                        title="Remove member"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

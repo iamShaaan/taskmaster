@@ -421,6 +421,9 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
         setAdding(true);
         try {
             const { searchByUserCode, updateDocById: update } = await import('../firebase/firestore');
+            const { db, APP_ID } = await import('../firebase/config');
+            const { collection, query, where, getDocs, writeBatch, doc } = await import('firebase/firestore');
+
             const results = await searchByUserCode(userCode.trim());
             if (results.length === 0) { toast.error('No user found with that code.'); return; }
             const found = results[0];
@@ -439,7 +442,23 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
             const updatedAdminUids = role === 'admin' ? [...(project.admin_uids || []), targetUid] : (project.admin_uids || []);
             const updatedModeratorUids = role === 'moderator' ? [...(project.moderator_uids || []), targetUid] : (project.moderator_uids || []);
             const updatedViewerUids = role === 'viewer' ? [...(project.viewer_uids || []), targetUid] : (project.viewer_uids || []);
+
+            // 1. Update Project
             await update('projects', project.id, { members: updatedMembers, member_uids: updatedMemberUids, admin_uids: updatedAdminUids, moderator_uids: updatedModeratorUids, viewer_uids: updatedViewerUids });
+
+            // 2. Sync Tasks
+            const tasksQuery = query(collection(db, `apps/${APP_ID}/tasks`), where('project_id', '==', project.id));
+            const tasksSnap = await getDocs(tasksQuery);
+            if (!tasksSnap.empty) {
+                const batch = writeBatch(db);
+                tasksSnap.docs.forEach(d => {
+                    batch.update(doc(db, `apps/${APP_ID}/tasks`, d.id), {
+                        project_member_uids: updatedMemberUids
+                    });
+                });
+                await batch.commit();
+            }
+
             setUserCode(''); setSelectedMember('');
             toast.success(`Added ${found.displayName || emailLabel || 'member'} as ${role}`);
         } catch (err) {
@@ -453,12 +472,31 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
     const handleRemoveMember = async (targetUid: string) => {
         try {
             const { updateDocById: update } = await import('../firebase/firestore');
+            const { db, APP_ID } = await import('../firebase/config');
+            const { collection, query, where, getDocs, writeBatch, doc } = await import('firebase/firestore');
+
             const updatedMembers = (project.members || []).filter((m: { uid: string }) => m.uid !== targetUid);
             const updatedMemberUids = (project.member_uids || []).filter((u: string) => u !== targetUid);
             const updatedAdminUids = (project.admin_uids || []).filter((u: string) => u !== targetUid);
             const updatedModeratorUids = (project.moderator_uids || []).filter((u: string) => u !== targetUid);
             const updatedViewerUids = (project.viewer_uids || []).filter((u: string) => u !== targetUid);
+
+            // 1. Update Project
             await update('projects', project.id, { members: updatedMembers, member_uids: updatedMemberUids, admin_uids: updatedAdminUids, moderator_uids: updatedModeratorUids, viewer_uids: updatedViewerUids });
+
+            // 2. Sync Tasks
+            const tasksQuery = query(collection(db, `apps/${APP_ID}/tasks`), where('project_id', '==', project.id));
+            const tasksSnap = await getDocs(tasksQuery);
+            if (!tasksSnap.empty) {
+                const batch = writeBatch(db);
+                tasksSnap.docs.forEach(d => {
+                    batch.update(doc(db, `apps/${APP_ID}/tasks`, d.id), {
+                        project_member_uids: updatedMemberUids
+                    });
+                });
+                await batch.commit();
+            }
+
             toast.success('Member removed');
         } catch (e) {
             console.error(e);
@@ -538,6 +576,30 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
                 {members.map((m) => {
                     const cfg = ROLE_CONFIG[m.role as keyof typeof ROLE_CONFIG] || ROLE_CONFIG.viewer;
                     const isYou = m.uid === auth.currentUser?.uid;
+
+                    const handleUpdateRole = async (newRole: string) => {
+                        try {
+                            const { updateDocById: update } = await import('../firebase/firestore');
+                            const updatedMembers = (project.members || []).map((mem: any) =>
+                                mem.uid === m.uid ? { ...mem, role: newRole } : mem
+                            );
+                            const updatedAdminUids = updatedMembers.filter((mem: any) => mem.role === 'admin').map((mem: any) => mem.uid);
+                            const updatedModeratorUids = updatedMembers.filter((mem: any) => mem.role === 'moderator').map((mem: any) => mem.uid);
+                            const updatedViewerUids = updatedMembers.filter((mem: any) => mem.role === 'viewer').map((mem: any) => mem.uid);
+
+                            await update('projects', project.id, {
+                                members: updatedMembers,
+                                admin_uids: updatedAdminUids,
+                                moderator_uids: updatedModeratorUids,
+                                viewer_uids: updatedViewerUids
+                            });
+                            toast.success('Member role updated');
+                        } catch (e) {
+                            console.error(e);
+                            toast.error('Failed to update role');
+                        }
+                    };
+
                     return (
                         <div key={m.uid} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-white/5">
                             <div className="flex items-center gap-3">
@@ -550,8 +612,20 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
-                                {isOwner && (
+                                {isOwner && !isYou ? (
+                                    <select
+                                        value={m.role}
+                                        onChange={(e) => handleUpdateRole(e.target.value)}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border bg-transparent outline-none cursor-pointer hover:border-indigo-500/50 transition-all ${cfg.color}`}
+                                    >
+                                        <option value="admin" className="bg-slate-900">Admin</option>
+                                        <option value="moderator" className="bg-slate-900">Moderator</option>
+                                        <option value="viewer" className="bg-slate-900">Viewer</option>
+                                    </select>
+                                ) : (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.color}`}>{cfg.label}</span>
+                                )}
+                                {isOwner && !isYou && (
                                     <button onClick={() => handleRemoveMember(m.uid)} className="p-1.5 text-slate-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10" title="Remove member">
                                         <Trash2 size={14} />
                                     </button>
