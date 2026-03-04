@@ -8,6 +8,14 @@ export interface ProjectMember {
     added_at: Date;
 }
 
+export interface TaskNote {
+    id: string;
+    content: string;
+    author_id: string;
+    author_name: string;
+    created_at: Date;
+}
+
 // ─── Core Entities ────────────────────────────────────────────────────────────
 export interface Task {
     id: string;
@@ -32,6 +40,7 @@ export interface Task {
     assignee_email?: string | null;
     project_member_uids?: string[];
     active_timer?: { start: Date; user_id: string } | null;
+    notes?: TaskNote[];
 }
 
 export interface TimeLog {

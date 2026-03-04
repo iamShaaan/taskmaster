@@ -15,6 +15,34 @@
             ]
         },
         {
+            "collectionGroup": "tasks",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "assignee_id",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_at",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "tasks",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "project_member_uids",
+                    "arrayConfig": "CONTAINS"
+                },
+                {
+                    "fieldPath": "created_at",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
             "collectionGroup": "meetings",
             "queryScope": "COLLECTION",
             "fields": [

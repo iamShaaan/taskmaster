@@ -47,6 +47,10 @@ const DataLoader: React.FC = () => {
           end: toDate(l.end) || new Date(),
           duration_ms: l.duration_ms as number,
         })),
+        notes: (d.notes || []).map((n: any) => ({
+          ...n,
+          created_at: toDate(n.created_at) || new Date(),
+        })),
       } as unknown as Task)));
     };
 
