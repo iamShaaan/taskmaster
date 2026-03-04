@@ -18,13 +18,7 @@ interface TaskCardProps {
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = false }) => {
-    const { isRunning, elapsed, start, stop } = useTimer(
-        task.id,
-        task.time_logs || [],
-        'tasks',
-        task.project_id ?? undefined,
-        task.title
-    );
+    const { isRunning, elapsed, start, stop } = useTimer(task);
     const overdue = task.due_date ? isOverdue(task.due_date) && task.status !== 'done' : false;
     const [deleting, setDeleting] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
@@ -74,7 +68,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                 <div className="flex-1">
                     <button
                         onClick={() => setShowDetails(true)}
-                        className="text-slate-50 font-semibold text-sm leading-relaxed line-clamp-2 hover:text-indigo-400 hover:underline transition-colors text-left"
+                        className="text-slate-50 font-semibold text-sm leading-relaxed line-clamp-2 hover:text-indigo-300 hover:drop-shadow-[0_0_8px_rgba(129,140,248,0.5)] transform transition-all duration-300 hover:-translate-y-0.5 text-left"
                     >
                         {task.title}
                     </button>

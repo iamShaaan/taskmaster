@@ -31,12 +31,16 @@ export interface Task {
     assignee_name?: string | null;
     assignee_email?: string | null;
     project_member_uids?: string[];
+    active_timer?: { start: Date; user_id: string } | null;
 }
 
 export interface TimeLog {
     start: Date;
     end: Date;
     duration_ms: number;
+    user_id?: string;
+    user_name?: string;
+    user_email?: string;
 }
 
 // A time entry recorded on a project when a task timer is stopped
@@ -47,6 +51,9 @@ export interface ProjectTimeEntry {
     start: Date;
     end: Date;
     duration_ms: number;
+    user_id?: string;
+    user_name?: string;
+    user_email?: string;
 }
 
 export interface Meeting {
