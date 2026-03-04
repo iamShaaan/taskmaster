@@ -169,7 +169,7 @@ function App() {
             <Route path="user-data" element={<UserDataLayout />}>
               <Route index element={<Clients />} />
               <Route path="clients/:id" element={<ClientDetail />} />
-              <Route path="team" element={<TeamMembers profile={{}} setProfile={() => { }} />} />
+              <Route path="team" element={<TeamMembers />} />
               <Route path="notes" element={<Notes />} />
               <Route path="files" element={<Files />} />
               <Route path="archive" element={<ArchivePage />} />
