@@ -2,8 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FolderKanban, CheckSquare, Calendar,
-    FileArchive, Timer, Upload, ExternalLink, Users, Download, Trash2, Clock
+    FileArchive, Timer, Upload, ExternalLink, Users, Download, Trash2, Clock, Plus
 } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
+import { TaskForm } from '../components/tasks/TaskForm';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { statusBadge } from '../components/ui/Badge';
@@ -130,6 +132,8 @@ export const ProjectDetail: React.FC = () => {
 
     const project = projects.find((p) => p.id === id);
     const client = clients.find((c) => c.id === project?.client_id);
+    const [showTaskForm, setShowTaskForm] = useState(false);
+    const [editTask, setEditTask] = useState<Task | undefined>();
     const isOwner = auth.currentUser?.uid === project?.owner_id;
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -187,6 +191,7 @@ export const ProjectDetail: React.FC = () => {
     }
 
     const projectTasks = tasks.filter((t) => t.project_id === id);
+    const isAdmin = isOwner || (project?.admin_uids?.includes(auth.currentUser?.uid || ''));
     const projectMeetings = meetings.filter((m) => m.linked_project_id === id);
 
     // Total time = sum of all task total_time_ms for this project
@@ -316,12 +321,27 @@ export const ProjectDetail: React.FC = () => {
                 <div className="lg:col-span-2 space-y-8">
                     {/* Tasks */}
                     <section>
-                        <h2 className="text-slate-100 font-bold mb-4 flex items-center gap-2">
-                            <CheckSquare size={18} className="text-indigo-400" /> Project Tasks
-                        </h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-slate-100 font-bold flex items-center gap-2 text-lg">
+                                <CheckSquare size={18} className="text-indigo-400" /> Project Tasks
+                            </h2>
+                            {isAdmin && (
+                                <button
+                                    onClick={() => { setEditTask(undefined); setShowTaskForm(true); }}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20"
+                                >
+                                    <Plus size={14} /> Add Task
+                                </button>
+                            )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {projectTasks.map(t => (
-                                <TaskCard key={t.id} task={t} onEdit={() => { }} compact={false} />
+                                <TaskCard
+                                    key={t.id}
+                                    task={t}
+                                    onEdit={(task) => { setEditTask(task); setShowTaskForm(true); }}
+                                    compact={false}
+                                />
                             ))}
                             {projectTasks.length === 0 && (
                                 <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl text-slate-600 italic">
@@ -368,6 +388,20 @@ export const ProjectDetail: React.FC = () => {
                 </div>
 
             </div>
+            {showTaskForm && (
+                <Modal
+                    isOpen={showTaskForm}
+                    title={editTask ? "Edit Task" : "Add New Project Task"}
+                    onClose={() => { setShowTaskForm(false); setEditTask(undefined); }}
+                >
+                    <TaskForm
+                        onClose={() => { setShowTaskForm(false); setEditTask(undefined); }}
+                        editTask={editTask}
+                        initialProjectId={project.id}
+                        initialClientId={project.client_id || undefined}
+                    />
+                </Modal>
+            )}
         </div>
     );
 };

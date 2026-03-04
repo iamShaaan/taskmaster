@@ -27,7 +27,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
     const uid = auth.currentUser?.uid;
     const isOwner = uid === task.owner_id;
     const isAssignee = uid === task.assignee_id;
-    const canPostNote = isOwner || isAssignee;
+    const isProjectMember = task.project_member_uids?.includes(uid || '');
+    const canPostNote = isOwner || isAssignee || isProjectMember;
 
     const handleAddNote = async (e: React.FormEvent) => {
         e.preventDefault();

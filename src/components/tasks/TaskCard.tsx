@@ -32,7 +32,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
     const uid = auth.currentUser?.uid;
     const isOwner = uid === task.owner_id;
     const isAssignee = uid === task.assignee_id;
-    const canInteract = isOwner || isAssignee; // Can edit, set timer
+    const isProjectMember = task.project_member_uids?.includes(uid || '');
+    const canInteract = isOwner || isAssignee || isProjectMember; // Can edit, set timer
     const canDelete = isOwner; // Only owner can delete
 
     const handleDelete = async () => {

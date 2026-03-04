@@ -9,12 +9,14 @@ import { X, Plus, Tag, Users, FolderKanban, UserCircle } from 'lucide-react';
 interface TaskFormProps {
     onClose: () => void;
     editTask?: Task;
+    initialProjectId?: string;
+    initialClientId?: string;
 }
 
 const inputCls = 'w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-500';
 const labelCls = 'block text-slate-400 text-xs font-medium mb-1';
 
-export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
+export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask, initialProjectId, initialClientId }) => {
     const { user } = useAuth();
     const { clients, projects } = useAppStore();
     const [loading, setLoading] = useState(false);
@@ -22,12 +24,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onClose, editTask }) => {
     const [form, setForm] = useState({
         title: editTask?.title || '',
         description: editTask?.description || '',
-        type: editTask?.type || 'personal' as 'personal' | 'project' | 'client',
+        type: editTask?.type || (initialProjectId || initialClientId ? 'project' : 'personal') as 'personal' | 'project' | 'client',
         status: editTask?.status || 'open' as Task['status'],
         priority: editTask?.priority || 'medium' as Task['priority'],
         due_date: editTask?.due_date ? editTask.due_date.toISOString().slice(0, 16) : '',
-        project_id: editTask?.project_id || '',
-        client_id: editTask?.client_id || '',
+        project_id: editTask?.project_id || initialProjectId || '',
+        client_id: editTask?.client_id || initialClientId || '',
         assignee_id: editTask?.assignee_id || '',
         tags: editTask?.tags || [] as string[],
     });
