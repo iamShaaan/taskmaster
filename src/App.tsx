@@ -58,19 +58,19 @@ const DataLoader: React.FC = () => {
     unsubs.push(listenCollection('tasks', (data) => {
       tasksState.owned = data.filter(d => !d.deleted_at);
       updateTasks();
-    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
+    }, where('owner_id', '==', user.uid)));
 
     // Assigned tasks
     unsubs.push(listenCollection('tasks', (data) => {
       tasksState.assigned = data.filter(d => !d.deleted_at);
       updateTasks();
-    }, where('assignee_id', '==', user.uid), orderBy('created_at', 'desc')));
+    }, where('assignee_id', '==', user.uid)));
 
     // Shared project tasks
     unsubs.push(listenCollection('tasks', (data) => {
       tasksState.shared = data.filter(d => !d.deleted_at);
       updateTasks();
-    }, where('project_member_uids', 'array-contains', user.uid), orderBy('created_at', 'desc')));
+    }, where('project_member_uids', 'array-contains', user.uid)));
 
     unsubs.push(listenCollection('meetings', (data) => {
       setMeetings(data.filter(d => !d.deleted_at).map((d) => ({
