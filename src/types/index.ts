@@ -41,6 +41,7 @@ export interface Task {
     project_member_uids?: string[];
     active_timer?: { start: Date; user_id: string } | null;
     notes?: TaskNote[];
+    is_archived?: boolean;
 }
 
 export interface TimeLog {
@@ -64,6 +65,7 @@ export interface ProjectTimeEntry {
     user_name?: string;
     user_email?: string;
     is_active?: boolean;
+    is_archived?: boolean;
 }
 
 export interface Meeting {
@@ -83,6 +85,7 @@ export interface Meeting {
     location?: string;
     outcome?: 'ended' | 'success' | 'failed'; // status set after meeting ends
     owner_id?: string;
+    is_archived?: boolean;
 }
 
 
@@ -136,6 +139,7 @@ export interface Note {
     updated_at: Date;
     owner_id?: string;
     linked_project_id?: string;
+    is_archived?: boolean;
 }
 
 export interface UserProfile {
@@ -166,6 +170,7 @@ export interface FileAttachment {
     uploaded_at: Date;
     entity_type: 'task' | 'project' | 'client';
     entity_id: string;
+    is_archived?: boolean;
 }
 
 export interface N8nAction {

@@ -1,9 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-    ArrowLeft, FolderKanban, CheckSquare, Calendar,
-    FileArchive, Timer, Upload, ExternalLink, Users, Download, Trash2, Clock, Plus, FileText
-} from 'lucide-react';
+import { FileText, Plus, ExternalLink, Calendar, Users, FileArchive, Upload, Download, Trash2, ArrowLeft, Archive, ArchiveRestore, Timer, Clock, FolderKanban, CheckSquare } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { TaskForm } from '../components/tasks/TaskForm';
 import { NoteEditor } from '../components/notes/NoteEditor';
@@ -16,15 +13,16 @@ import { auth } from '../firebase/config';
 import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
-import type { Project, ProjectTimeEntry, Task, TimeLog, Note } from '../types';
+import type { Project, ProjectTimeEntry, Task, Note } from '../types';
 
 // ─── Time Records Section ──────────────────────────────────────────────────────
 
-const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ project, tasks }) => {
+const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[]; viewMode: 'active' | 'archive' }> = ({ project, tasks, viewMode }) => {
     // Derive time entries: combine project-level time_entries (from stopped task timers)
     // PLUS live task time_logs (for tasks already stored in Firestore)
-    const taskEntries = tasks.flatMap((t) => {
-        const logs = (t.time_logs || []).map((log: TimeLog) => ({
+    const taskEntries: ProjectTimeEntry[] = tasks.flatMap((t) => {
+        if (!t.time_logs) return [];
+        const logs: ProjectTimeEntry[] = t.time_logs.map(log => ({
             task_id: t.id,
             task_title: t.title,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,7 +34,8 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
             user_id: log.user_id,
             user_name: log.user_name,
             user_email: log.user_email,
-            is_active: false
+            is_active: false,
+            is_archived: t.is_archived
         }));
 
         if (t.active_timer) {
@@ -53,7 +52,8 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 user_name: (t.active_timer as any).user_name,
                 user_email: undefined,
-                is_active: true
+                is_active: true,
+                is_archived: t.is_archived
             });
         }
         return logs;
@@ -64,12 +64,15 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
 
     // Merge — deduplicate by task_id + date + duration_ms
     const seen = new Set<string>();
-    const all = [...taskEntries, ...projectEntries].filter((e) => {
+    let all = [...taskEntries, ...projectEntries].filter((e) => {
         const key = `${e.task_id}-${e.date}-${e.duration_ms}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
     });
+
+    // Archive Filter
+    all = all.filter(e => viewMode === 'archive' ? e.is_archived : !e.is_archived);
 
     // Sort newest first
     all.sort((a, b) => {
@@ -137,11 +140,13 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
                                     : (entry.user_name || entry.user_email?.split('@')[0] || project.members?.find(m => m.uid === entry.user_id)?.email?.split('@')[0] || (entry as any).assignee_name || ((entry as any).assignee_email)?.split('@')[0] || (entry.user_id === project.owner_id ? 'Owner' : 'Unknown'))}
                             </span>
                             <span className="text-slate-500 text-xs text-right whitespace-nowrap">{dateLabel}</span>
-                            <span className={`text-xs font-mono font-bold text-right whitespace-nowrap ${entry.is_active ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                {entry.is_active ? (
-                                    <span className="flex items-center justify-end gap-1"><Timer size={12} className="animate-spin-slow" /> Running...</span>
-                                ) : formatDuration(entry.duration_ms)}
-                            </span>
+                            <div className="flex items-center gap-1 justify-end">
+                                <span className={`text-xs font-mono font-bold text-right whitespace-nowrap ${entry.is_active ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                    {entry.is_active ? (
+                                        <span className="flex items-center justify-end gap-1"><Timer size={12} className="animate-spin-slow" /> Running...</span>
+                                    ) : formatDuration(entry.duration_ms)}
+                                </span>
+                            </div>
                         </div>
                     );
                 })}
@@ -152,12 +157,22 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
 
 // ─── Project Notes Section ───────────────────────────────────────────
 
-const ProjectNotes: React.FC<{ project: Project }> = ({ project }) => {
+const ProjectNotes: React.FC<{ project: Project; viewMode: 'active' | 'archive' }> = ({ project, viewMode }) => {
     const { notes } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editNote, setEditNote] = useState<Note | undefined>();
 
-    const projectNotes = notes.filter((n) => n.linked_project_id === project.id);
+    const projectNotes = notes.filter((n) => n.linked_project_id === project.id && (viewMode === 'archive' ? n.is_archived : !n.is_archived));
+
+    const handleToggleArchive = async (e: React.MouseEvent, note: Note) => {
+        e.stopPropagation();
+        try {
+            await updateDocById('notes', note.id, { is_archived: !note.is_archived });
+            toast.success(note.is_archived ? 'Note unarchived' : 'Note archived');
+        } catch (error) {
+            toast.error('Failed to change archive status');
+        }
+    };
 
     return (
         <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 mb-8">
@@ -175,9 +190,18 @@ const ProjectNotes: React.FC<{ project: Project }> = ({ project }) => {
 
             <div className="space-y-3">
                 {projectNotes.map(note => (
-                    <div key={note.id} className="p-4 bg-slate-900/50 border border-white/5 rounded-xl group hover:border-blue-500/30 transition-all cursor-pointer" onClick={() => { setEditNote(note); setShowForm(true); }}>
-                        <h3 className="text-slate-200 font-medium group-hover:text-blue-400 transition-colors">{note.title}</h3>
-                        <p className="text-slate-500 text-xs mt-1 line-clamp-2">{note.content}</p>
+                    <div key={note.id} className="p-4 bg-slate-900/50 border border-white/5 rounded-xl group hover:border-blue-500/30 transition-all cursor-pointer flex justify-between items-start" onClick={() => { setEditNote(note); setShowForm(true); }}>
+                        <div>
+                            <h3 className="text-slate-200 font-medium group-hover:text-blue-400 transition-colors">{note.title}</h3>
+                            <p className="text-slate-500 text-xs mt-1 line-clamp-2">{note.content}</p>
+                        </div>
+                        <button
+                            onClick={(e) => handleToggleArchive(e, note)}
+                            className="p-1.5 text-slate-600 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all rounded"
+                            title={viewMode === 'archive' ? "Unarchive Note" : "Archive Note"}
+                        >
+                            {viewMode === 'archive' ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                        </button>
                     </div>
                 ))}
                 {projectNotes.length === 0 && (
@@ -204,6 +228,7 @@ export const ProjectDetail: React.FC = () => {
     const client = clients.find((c) => c.id === project?.client_id);
     const [showTaskForm, setShowTaskForm] = useState(false);
     const [editTask, setEditTask] = useState<Task | undefined>();
+    const [viewMode, setViewMode] = useState<'active' | 'archive'>('active');
     const isOwner = auth.currentUser?.uid === project?.owner_id;
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -260,10 +285,11 @@ export const ProjectDetail: React.FC = () => {
         );
     }
 
-    const projectTasks = tasks.filter((t) => t.project_id === id);
+    const projectTasks = tasks.filter((t) => t.project_id === id && (viewMode === 'archive' ? t.is_archived : !t.is_archived));
     const isAdmin = isOwner || (project?.admin_uids?.includes(auth.currentUser?.uid || ''));
     const isModerator = isAdmin || (project?.moderator_uids?.includes(auth.currentUser?.uid || ''));
-    const projectMeetings = meetings.filter((m) => m.linked_project_id === id);
+    const projectMeetings = meetings.filter((m) => m.linked_project_id === id && (viewMode === 'archive' ? m.is_archived : !m.is_archived));
+    const projectFiles = (project.files || []).filter(f => viewMode === 'archive' ? f.is_archived : !f.is_archived);
 
     // Total time = sum of all task total_time_ms for this project
     const totalMs = projectTasks.reduce((sum, t) => sum + (t.total_time_ms || 0), 0);
@@ -297,6 +323,22 @@ export const ProjectDetail: React.FC = () => {
                             <span>Created {formatDate(project.created_at)}</span>
                         </div>
                     </div>
+                </div>
+
+                {/* Archive Toggle */}
+                <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/5 backdrop-blur-md self-start md:self-auto">
+                    <button
+                        onClick={() => setViewMode('active')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'active' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        Active Board
+                    </button>
+                    <button
+                        onClick={() => setViewMode('archive')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'archive' ? 'bg-slate-700 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        <Archive size={14} /> Project Archive
+                    </button>
                 </div>
 
                 {/* Total Time Display — read-only */}
@@ -360,7 +402,7 @@ export const ProjectDetail: React.FC = () => {
                         )}
 
                         <div className="space-y-2">
-                            {project.files?.map(f => (
+                            {projectFiles.map(f => (
                                 <div key={f.id} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl group border border-transparent hover:border-indigo-500/20 transition-all">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <FileArchive size={16} className="text-indigo-400 flex-shrink-0" />
@@ -374,15 +416,26 @@ export const ProjectDetail: React.FC = () => {
                                             <ExternalLink size={14} />
                                         </a>
                                         {(isOwner || isAdmin || isModerator) && (
-                                            <button onClick={() => handleDeleteFile(f.id, f.url)} title="Delete file" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
-                                                <Trash2 size={14} />
-                                            </button>
+                                            <>
+                                                <button onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    try {
+                                                        const updatedFiles = (project.files || []).map(pf => pf.id === f.id ? { ...pf, is_archived: !f.is_archived } : pf);
+                                                        await updateDocById('projects', project.id, { files: updatedFiles });
+                                                    } catch (err) { }
+                                                }} className="p-1.5 text-slate-500 hover:text-amber-400 transition-colors" title={viewMode === 'archive' ? "Unarchive file" : "Archive file"}>
+                                                    {viewMode === 'archive' ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                                                </button>
+                                                <button onClick={() => handleDeleteFile(f.id, f.url)} title="Delete file" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
                             ))}
-                            {(!project.files || project.files.length === 0) && (
-                                <p className="text-slate-600 text-xs text-center py-4">No files uploaded yet</p>
+                            {projectFiles.length === 0 && (
+                                <p className="text-slate-600 text-xs text-center py-4">No files found</p>
                             )}
                         </div>
                     </section>
@@ -423,10 +476,10 @@ export const ProjectDetail: React.FC = () => {
                     </section>
 
                     {/* Time Records */}
-                    <ProjectTimeLogs project={project} tasks={projectTasks} />
+                    <ProjectTimeLogs project={project} tasks={projectTasks} viewMode={viewMode} />
 
                     {/* Project Notes */}
-                    <ProjectNotes project={project} />
+                    <ProjectNotes project={project} viewMode={viewMode} />
 
                     {/* Meetings */}
                     <section>
@@ -448,7 +501,15 @@ export const ProjectDetail: React.FC = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    <ExternalLink size={14} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        <ExternalLink size={14} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                        <button onClick={async (e) => {
+                                            e.stopPropagation();
+                                            await updateDocById('meetings', m.id, { is_archived: !m.is_archived });
+                                        }} className="p-2 text-slate-600 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all" title={viewMode === 'archive' ? "Unarchive meeting" : "Archive meeting"}>
+                                            {viewMode === 'archive' ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                             {projectMeetings.length === 0 && (

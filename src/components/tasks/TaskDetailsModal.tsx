@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, Tag, FolderKanban, Users, UserCircle, AlignLeft, Activity } from 'lucide-react';
+import { X, Calendar, Clock, Tag, FolderKanban, Users, UserCircle, AlignLeft, Activity, Archive, ArchiveRestore } from 'lucide-react';
 import type { Task } from '../../types';
 import { statusBadge, priorityBadge, typeBadge } from '../ui/Badge';
 import { formatDuration, formatDate } from '../../utils/timeFormat';
@@ -123,12 +123,30 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
                                 {typeBadge(task.type)}
                             </div>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors flex-shrink-0"
-                        >
-                            <X size={20} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {(isOwner || isAssignee || isProjectMember) && (
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const taskRef = doc(db, `apps/${APP_ID}/tasks`, task.id);
+                                            await updateDoc(taskRef, { is_archived: !task.is_archived });
+                                            toast.success(task.is_archived ? 'Task unarchived' : 'Task archived');
+                                            onClose();
+                                        } catch (e) { toast.error('Failed to change archive status'); }
+                                    }}
+                                    className={`p-2 rounded-lg transition-colors flex-shrink-0 flex items-center justify-center ${task.is_archived ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'}`}
+                                    title={task.is_archived ? 'Unarchive Task' : 'Archive Task'}
+                                >
+                                    {task.is_archived ? <ArchiveRestore size={20} /> : <Archive size={20} />}
+                                </button>
+                            )}
+                            <button
+                                onClick={onClose}
+                                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors flex-shrink-0"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Scrollable Body */}
