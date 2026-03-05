@@ -12,7 +12,13 @@ export const useTimer = (task: Task) => {
 
     useEffect(() => {
         if (isRunning && timerStartTime) {
-            const startTimeMs = timerStartTime instanceof Date ? timerStartTime.getTime() : (timerStartTime as any).toDate ? (timerStartTime as any).toDate().getTime() : new Date(timerStartTime).getTime();
+            const startTimeMs = timerStartTime instanceof Date
+                ? timerStartTime.getTime()
+                : (timerStartTime as any).toDate
+                    ? (timerStartTime as any).toDate().getTime()
+                    : typeof (timerStartTime as any).seconds === 'number'
+                        ? (timerStartTime as any).seconds * 1000
+                        : new Date(timerStartTime as any).getTime();
 
             setElapsed(Date.now() - startTimeMs);
 
@@ -47,7 +53,13 @@ export const useTimer = (task: Task) => {
     const stop = useCallback(async () => {
         if (!isRunning || !timerStartTime) return;
         const endTime = new Date();
-        const startTimeMs = timerStartTime instanceof Date ? timerStartTime.getTime() : (timerStartTime as any).toDate ? (timerStartTime as any).toDate().getTime() : new Date(timerStartTime).getTime();
+        const startTimeMs = timerStartTime instanceof Date
+            ? timerStartTime.getTime()
+            : (timerStartTime as any).toDate
+                ? (timerStartTime as any).toDate().getTime()
+                : typeof (timerStartTime as any).seconds === 'number'
+                    ? (timerStartTime as any).seconds * 1000
+                    : new Date(timerStartTime as any).getTime();
         const duration_ms = endTime.getTime() - startTimeMs;
 
         const user = auth.currentUser;

@@ -64,13 +64,21 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[]; viewMode: 'ac
     const projectEntries: ProjectTimeEntry[] = project.time_entries || [];
 
     // Merge — deduplicate by task_id + date + duration_ms
-    const seen = new Set<string>();
-    let all = [...taskEntries, ...projectEntries].filter((e) => {
+    const entryMap = new Map<string, ProjectTimeEntry>();
+    [...taskEntries, ...projectEntries].forEach((e) => {
         const key = `${e.task_id}-${e.date}-${e.duration_ms}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
+        if (entryMap.has(key)) {
+            // If any duplicate is archived, mark the merged result as archived
+            if (e.is_archived) {
+                entryMap.get(key)!.is_archived = true;
+            }
+        } else {
+            // Deep clone to avoid mutating the original array state directly when we set is_archived
+            entryMap.set(key, { ...e });
+        }
     });
+
+    let all = Array.from(entryMap.values());
 
     // Archive Filter
     all = all.filter(e => viewMode === 'archive' ? e.is_archived : !e.is_archived);
@@ -151,6 +159,12 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[]; viewMode: 'ac
                                     <button
                                         onClick={async (e) => {
                                             e.stopPropagation();
+                                            const linkedTask = tasks.find((t) => t.id === entry.task_id);
+                                            if (linkedTask && linkedTask.status !== 'done' && !entry.is_archived) {
+                                                toast.error('Time records can only be archived when the task is done.');
+                                                return;
+                                            }
+
                                             try {
                                                 if (entry.task_id && project.time_entries?.some((pe: any) => pe.task_id === entry.task_id && pe.duration_ms === entry.duration_ms)) {
                                                     const updated = (project.time_entries || []).map((pe: any) =>
