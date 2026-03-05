@@ -72,14 +72,33 @@ const DataLoader: React.FC = () => {
       updateTasks();
     }, where('project_member_uids', 'array-contains', user.uid)));
 
-    unsubs.push(listenCollection('meetings', (data) => {
-      setMeetings(data.filter(d => !d.deleted_at).map((d) => ({
+    const meetingsState = { owned: [] as any[], shared: [] as any[] };
+    const updateMeetings = () => {
+      const merged = [...meetingsState.owned, ...meetingsState.shared];
+      const unique = merged.filter((m, i, a) => a.findIndex(x => x.id === m.id) === i)
+        .sort((a, b) => {
+          const aTime = a.start_time?.toMillis?.() || 0;
+          const bTime = b.start_time?.toMillis?.() || 0;
+          return aTime - bTime;
+        });
+
+      setMeetings(unique.map((d) => ({
         ...d,
         start_time: toDate(d.start_time as never) || new Date(),
         end_time: toDate(d.end_time as never) || new Date(),
         created_at: toDate(d.created_at as never) || new Date(),
       } as unknown as Meeting)));
-    }, where('owner_id', '==', user.uid), orderBy('start_time', 'asc')));
+    };
+
+    unsubs.push(listenCollection('meetings', (data) => {
+      meetingsState.owned = data.filter(d => !d.deleted_at);
+      updateMeetings();
+    }, where('owner_id', '==', user.uid)));
+
+    unsubs.push(listenCollection('meetings', (data) => {
+      meetingsState.shared = data.filter(d => !d.deleted_at);
+      updateMeetings();
+    }, where('participant_uids', 'array-contains', user.uid)));
 
     unsubs.push(listenCollection('notes', (data) => {
       setNotes(data.filter(d => !d.deleted_at).map((d) => ({

@@ -23,6 +23,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
         status: editProject?.status || 'active' as Project['status'],
         priority: editProject?.priority || 'medium' as Project['priority'],
         client_id: editProject?.client_id || '',
+        due_date: editProject?.due_date ? editProject.due_date.toISOString().slice(0, 10) : '',
         color: editProject?.color || COLORS[0],
     });
 
@@ -33,7 +34,13 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
         if (!form.name.trim()) { toast.error('Project name required'); return; }
         setLoading(true);
         try {
-            const data = { ...form, client_id: form.client_id || null, priority: form.priority || 'medium', files: editProject?.files || [] };
+            const data = {
+                ...form,
+                client_id: form.client_id || null,
+                priority: form.priority || 'medium',
+                due_date: form.due_date ? new Date(form.due_date) : null,
+                files: editProject?.files || []
+            };
             if (editProject) {
                 await updateDocById('projects', editProject.id, data as Record<string, unknown>);
                 toast.success('Project updated!');
@@ -83,6 +90,10 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ onClose, editProject }
                     <option value="">None</option>
                     {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+            </div>
+            <div>
+                <label className={labelCls}>Due Date</label>
+                <input type="date" className={inputCls} value={form.due_date} onChange={(e) => set('due_date', e.target.value)} />
             </div>
             <div>
                 <label className={labelCls}>Color</label>

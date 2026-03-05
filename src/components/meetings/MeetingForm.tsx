@@ -60,10 +60,19 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({ onClose, editMeeting }
         if (conflicts.length > 0 && !confirm(`Conflicts detected with: ${conflicts.map((c) => c.conflictingTitle).join(', ')}. Continue anyway?`)) return;
         setLoading(true);
         try {
+            let participant_uids: string[] = editMeeting?.participant_uids || [];
+            if (form.linked_project_id) {
+                const proj = projects.find(p => p.id === form.linked_project_id);
+                if (proj) {
+                    participant_uids = Array.from(new Set([...participant_uids, proj.owner_id, ...(proj.member_uids || [])]));
+                }
+            }
+
             const data = {
                 ...form,
                 start_time: start,
                 end_time: end,
+                participant_uids,
                 linked_task_id: form.linked_task_id || null,
                 linked_client_id: form.linked_client_id || null,
                 linked_project_id: form.linked_project_id || null,

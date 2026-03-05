@@ -34,7 +34,8 @@ export const useTimer = (task: Task) => {
         await updateDocById('tasks', task.id, {
             active_timer: {
                 start: now,
-                user_id: user?.uid || 'unknown'
+                user_id: user?.uid || 'unknown',
+                user_name: user?.displayName || user?.email || undefined
             }
         });
     }, [isRunning, task.id]);

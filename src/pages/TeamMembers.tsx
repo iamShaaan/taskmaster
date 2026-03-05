@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db, APP_ID } from '../firebase/config';
-import { doc, setDoc } from 'firebase/firestore';
-import { Users, Mail, X, UserPlus, Hash, User as UserIcon } from 'lucide-react';
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { Users, Mail, X, UserPlus, Hash, User as UserIcon, ShieldAlert, Crown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { UserProfile } from '../types';
 import { useOutletContext } from 'react-router-dom';
@@ -19,6 +19,32 @@ export const TeamMembers: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [leaders, setLeaders] = useState<UserProfile[]>([]);
+    const [loadingLeaders, setLoadingLeaders] = useState(true);
+
+    useEffect(() => {
+        const fetchLeaders = async () => {
+            if (!profile.uid) return;
+            try {
+                const snap = await getDocs(collection(db, `apps/${APP_ID}/users`));
+                const emails = [profile.personalEmail?.toLowerCase(), profile.professionalEmail?.toLowerCase()].filter(Boolean);
+                const code = profile.user_code;
+
+                const foundLeaders = snap.docs.map(d => ({ ...d.data(), uid: d.id } as UserProfile))
+                    .filter(u => u.uid !== profile.uid && u.teamMembers?.some(m =>
+                        (m.email && emails.includes(m.email.toLowerCase())) ||
+                        (m.user_code && m.user_code === code)
+                    ));
+
+                setLeaders(foundLeaders);
+            } catch (err) {
+                console.error('Error fetching leaders:', err);
+            } finally {
+                setLoadingLeaders(false);
+            }
+        };
+        fetchLeaders();
+    }, [profile]);
 
     const resetForm = () => {
         setName('');
@@ -239,6 +265,54 @@ export const TeamMembers: React.FC = () => {
                                     >
                                         <X size={16} />
                                     </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* My Leaders Section */}
+            <div className="pt-8 border-t border-white/10 mt-8 space-y-4">
+                <div>
+                    <h3 className="text-white text-lg font-black flex items-center gap-2 mb-1">
+                        <Crown size={18} className="text-amber-400" /> My Leaders
+                    </h3>
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
+                        People who have added you to their team
+                    </p>
+                </div>
+
+                {loadingLeaders ? (
+                    <div className="text-slate-500 text-sm animate-pulse">Loading leaders...</div>
+                ) : leaders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center opacity-40 text-center py-8 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/20">
+                        <ShieldAlert size={28} className="mb-2 text-slate-500" />
+                        <p className="text-xs font-medium text-slate-400">You haven't been added to anyone's team.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {leaders.map(leader => (
+                            <div key={leader.uid} className="flex items-center gap-4 bg-slate-950/80 p-4 rounded-2xl border border-white/5 hover:border-amber-500/30 transition-all">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-black border border-amber-500/20">
+                                    {(leader.displayName || leader.companyName || '?').charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-white text-sm font-bold truncate max-w-[200px]">
+                                        {leader.displayName || leader.fullName || 'Unnamed User'}
+                                    </p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {(leader.professionalEmail || leader.personalEmail) && (
+                                            <span className="text-slate-500 text-[10px] font-medium truncate max-w-[150px]">
+                                                {leader.professionalEmail || leader.personalEmail}
+                                            </span>
+                                        )}
+                                        {leader.user_code && (
+                                            <span className="text-amber-500/70 text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+                                                {leader.user_code}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}

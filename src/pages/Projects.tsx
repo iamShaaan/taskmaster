@@ -44,9 +44,10 @@ export const Projects: React.FC = () => {
                         const projectMeetings = meetings.filter((m) => m.linked_project_id === project.id);
                         const progress = projectTasks.length > 0 ? Math.round((doneTasks / projectTasks.length) * 100) : 0;
                         const totalTrackedMs = projectTasks.reduce((sum, t) => sum + (t.total_time_ms || 0), 0);
+                        const isDue = project.due_date && new Date(project.due_date) < new Date(new Date().setHours(0, 0, 0, 0)) && project.status !== 'completed';
 
                         return (
-                            <div key={project.id} className="group bg-slate-800 border border-slate-700/50 rounded-xl p-5 hover:border-indigo-500/40 transition-all">
+                            <div key={project.id} className={`group border rounded-xl p-5 transition-all ${isDue ? 'bg-red-500/10 border-red-500/30 hover:border-red-500/50' : 'bg-slate-800 border-slate-700/50 hover:border-indigo-500/40'}`}>
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />

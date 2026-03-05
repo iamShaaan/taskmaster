@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import type { Note } from '../../types';
 import { createDoc, updateDocById } from '../../firebase/firestore';
+import { auth } from '../../firebase/config';
 import toast from 'react-hot-toast';
 import { Lock, Unlock, Zap } from 'lucide-react';
 
 interface NoteEditorProps {
     onClose: () => void;
     editNote?: Note;
+    linked_project_id?: string;
 }
 
 const inputCls = 'w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-500';
 const labelCls = 'block text-slate-400 text-xs font-medium mb-1';
 
-export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote }) => {
+export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote, linked_project_id }) => {
     const [loading, setLoading] = useState(false);
     const [tagInput, setTagInput] = useState('');
     const [form, setForm] = useState({
@@ -21,6 +23,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote }) => 
         tags: editNote?.tags || [] as string[],
         is_secure: editNote?.is_secure || false,
         is_credential: editNote?.is_credential || false,
+        linked_project_id: editNote?.linked_project_id || linked_project_id || null,
     });
 
     const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
@@ -41,7 +44,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote }) => 
                 await updateDocById('notes', editNote.id, { ...form, updated_at: new Date() });
                 toast.success('Note updated!');
             } else {
-                await createDoc('notes', { ...form, updated_at: new Date() });
+                await createDoc('notes', { ...form, owner_id: auth.currentUser?.uid, updated_at: new Date() });
                 toast.success('Note saved!');
             }
             onClose();

@@ -2,10 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FolderKanban, CheckSquare, Calendar,
-    FileArchive, Timer, Upload, ExternalLink, Users, Download, Trash2, Clock, Plus
+    FileArchive, Timer, Upload, ExternalLink, Users, Download, Trash2, Clock, Plus, FileText
 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { TaskForm } from '../components/tasks/TaskForm';
+import { NoteEditor } from '../components/notes/NoteEditor';
 import { useAppStore } from '../store';
 import { TaskCard } from '../components/tasks/TaskCard';
 import { statusBadge } from '../components/ui/Badge';
@@ -15,15 +16,15 @@ import { auth } from '../firebase/config';
 import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
-import type { Project, ProjectTimeEntry, Task, TimeLog } from '../types';
+import type { Project, ProjectTimeEntry, Task, TimeLog, Note } from '../types';
 
 // ─── Time Records Section ──────────────────────────────────────────────────────
 
 const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ project, tasks }) => {
     // Derive time entries: combine project-level time_entries (from stopped task timers)
     // PLUS live task time_logs (for tasks already stored in Firestore)
-    const taskEntries = tasks.flatMap((t) =>
-        (t.time_logs || []).map((log: TimeLog) => ({
+    const taskEntries = tasks.flatMap((t) => {
+        const logs = (t.time_logs || []).map((log: TimeLog) => ({
             task_id: t.id,
             task_title: t.title,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,8 +36,28 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
             user_id: log.user_id,
             user_name: log.user_name,
             user_email: log.user_email,
-        }))
-    );
+            is_active: false
+        }));
+
+        if (t.active_timer) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const actStart = new Date(t.active_timer.start instanceof Date ? t.active_timer.start : (t.active_timer.start as any)?.toDate?.() ?? t.active_timer.start);
+            logs.push({
+                task_id: t.id,
+                task_title: t.title,
+                date: actStart.toISOString().split('T')[0],
+                start: actStart,
+                end: new Date(),
+                duration_ms: Date.now() - actStart.getTime(),
+                user_id: t.active_timer.user_id,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                user_name: (t.active_timer as any).user_name,
+                user_email: undefined,
+                is_active: true
+            });
+        }
+        return logs;
+    });
 
     // Also include any project-level time_entries (written by useTimer on stop)
     const projectEntries: ProjectTimeEntry[] = project.time_entries || [];
@@ -102,7 +123,10 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
                             className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center px-3 py-2.5 bg-slate-900/50 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all group"
                         >
                             <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 flex-shrink-0" />
+                                {entry.is_active ?
+                                    <Timer size={14} className="text-emerald-400 animate-spin-slow flex-shrink-0" /> :
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 flex-shrink-0" />
+                                }
                                 <span className="text-slate-200 text-xs font-medium truncate group-hover:text-amber-300 transition-colors">
                                     {entry.task_title}
                                 </span>
@@ -111,13 +135,57 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
                                 {entry.user_name || entry.user_email?.split('@')[0] || 'Unknown'}
                             </span>
                             <span className="text-slate-500 text-xs text-right whitespace-nowrap">{dateLabel}</span>
-                            <span className="text-amber-400 text-xs font-mono font-bold text-right whitespace-nowrap">
-                                {formatDuration(entry.duration_ms)}
+                            <span className={`text-xs font-mono font-bold text-right whitespace-nowrap ${entry.is_active ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {entry.is_active ? (
+                                    <span className="flex items-center justify-end gap-1"><Timer size={12} className="animate-spin-slow" /> Running...</span>
+                                ) : formatDuration(entry.duration_ms)}
                             </span>
                         </div>
                     );
                 })}
             </div>
+        </section>
+    );
+};
+
+// ─── Project Notes Section ───────────────────────────────────────────
+
+const ProjectNotes: React.FC<{ project: Project }> = ({ project }) => {
+    const { notes } = useAppStore();
+    const [showForm, setShowForm] = useState(false);
+    const [editNote, setEditNote] = useState<Note | undefined>();
+
+    const projectNotes = notes.filter((n) => n.linked_project_id === project.id);
+
+    return (
+        <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-slate-100 font-bold flex items-center gap-2">
+                    <FileText size={18} className="text-blue-400" /> Project Notes
+                </h2>
+                <button
+                    onClick={() => { setEditNote(undefined); setShowForm(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 text-xs font-bold rounded-lg transition-all"
+                >
+                    <Plus size={14} /> New Note
+                </button>
+            </div>
+
+            <div className="space-y-3">
+                {projectNotes.map(note => (
+                    <div key={note.id} className="p-4 bg-slate-900/50 border border-white/5 rounded-xl group hover:border-blue-500/30 transition-all cursor-pointer" onClick={() => { setEditNote(note); setShowForm(true); }}>
+                        <h3 className="text-slate-200 font-medium group-hover:text-blue-400 transition-colors">{note.title}</h3>
+                        <p className="text-slate-500 text-xs mt-1 line-clamp-2">{note.content}</p>
+                    </div>
+                ))}
+                {projectNotes.length === 0 && (
+                    <p className="text-slate-600 text-sm italic py-4 text-center border-2 border-dashed border-slate-800 rounded-xl">No notes added</p>
+                )}
+            </div>
+
+            <Modal isOpen={showForm} onClose={() => { setShowForm(false); setEditNote(undefined); }} title={editNote ? 'Edit Note' : 'New Project Note'} size="lg">
+                <NoteEditor onClose={() => { setShowForm(false); setEditNote(undefined); }} editNote={editNote} linked_project_id={project.id} />
+            </Modal>
         </section>
     );
 };
@@ -192,6 +260,7 @@ export const ProjectDetail: React.FC = () => {
 
     const projectTasks = tasks.filter((t) => t.project_id === id);
     const isAdmin = isOwner || (project?.admin_uids?.includes(auth.currentUser?.uid || ''));
+    const isModerator = isAdmin || (project?.moderator_uids?.includes(auth.currentUser?.uid || ''));
     const projectMeetings = meetings.filter((m) => m.linked_project_id === id);
 
     // Total time = sum of all task total_time_ms for this project
@@ -275,7 +344,7 @@ export const ProjectDetail: React.FC = () => {
                             <span className="text-xs font-normal text-slate-500">{project.files?.length || 0} items</span>
                         </h2>
 
-                        {isOwner && (
+                        {isModerator && (
                             <div
                                 {...getRootProps()}
                                 className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all mb-4 ${isDragActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-slate-500'}`}
@@ -353,6 +422,9 @@ export const ProjectDetail: React.FC = () => {
 
                     {/* Time Records */}
                     <ProjectTimeLogs project={project} tasks={projectTasks} />
+
+                    {/* Project Notes */}
+                    <ProjectNotes project={project} />
 
                     {/* Meetings */}
                     <section>

@@ -24,7 +24,7 @@ export interface Task {
     type: 'personal' | 'project' | 'client';
     project_id: string | null;
     client_id: string | null;
-    status: 'open' | 'in_progress' | 'done' | 'error';
+    status: 'open' | 'in_progress' | 'done' | 'overdue';
     priority: 'low' | 'medium' | 'high';
     due_date: Date | null;
     created_at: Date;
@@ -63,6 +63,7 @@ export interface ProjectTimeEntry {
     user_id?: string;
     user_name?: string;
     user_email?: string;
+    is_active?: boolean;
 }
 
 export interface Meeting {
@@ -72,6 +73,7 @@ export interface Meeting {
     start_time: Date;
     end_time: Date;
     participants: string[];
+    participant_uids?: string[];
     linked_task_id: string | null;
     linked_client_id: string | null;
     linked_project_id: string | null;
@@ -106,6 +108,7 @@ export interface Project {
     client_id: string | null;
     files: FileAttachment[];
     created_at: Date;
+    due_date?: Date | null;
     color: string;
     time_entries?: ProjectTimeEntry[];  // aggregated time from tasks
     owner_id: string;
@@ -130,6 +133,7 @@ export interface Note {
     created_at: Date;
     updated_at: Date;
     owner_id?: string;
+    linked_project_id?: string;
 }
 
 export interface UserProfile {

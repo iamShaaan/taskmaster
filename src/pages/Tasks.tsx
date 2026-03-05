@@ -14,7 +14,7 @@ const STATUS_COLUMNS = [
     { key: 'open', label: 'Open', color: 'border-slate-600' },
     { key: 'in_progress', label: 'In Progress', color: 'border-indigo-500' },
     { key: 'done', label: 'Done', color: 'border-emerald-500' },
-    { key: 'error', label: 'Error', color: 'border-red-500' },
+    { key: 'overdue', label: 'Task Due', color: 'border-red-500' },
 ] as const;
 
 export const Tasks: React.FC = () => {
@@ -120,7 +120,12 @@ export const Tasks: React.FC = () => {
                 <DragDropContext onDragEnd={onDragEnd}>
                     <div className="flex-1 flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                         {STATUS_COLUMNS.map(({ key, label, color }, idx) => {
-                            const colTasks = filtered.filter((t) => t.status === key);
+                            const isOverdue = (t: Task) => t.due_date && new Date(t.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+                            const colTasks = filtered.filter((t) => {
+                                if (t.status === 'done') return key === 'done';
+                                if (t.status === 'overdue' || isOverdue(t)) return key === 'overdue';
+                                return t.status === key;
+                            });
                             return (
                                 <motion.div
                                     key={key}

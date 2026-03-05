@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Lock, Unlock, Eye, EyeOff, Pencil, Trash2, Tag, Search, Shield, KeyRound, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Plus, Lock, Unlock, Eye, EyeOff, Pencil, Trash2, Tag, Search, Shield, KeyRound, AlertTriangle, RotateCcw, FolderKanban } from 'lucide-react';
 import { useAppStore } from '../store';
 import { NoteEditor } from '../components/notes/NoteEditor';
 import { Modal } from '../components/ui/Modal';
@@ -45,12 +45,12 @@ const PinDots: React.FC<{ value: string; inputRef: React.RefObject<HTMLInputElem
                 {[0, 1, 2, 3, 4, 5].map(i => (
                     <div
                         key={i}
-                        className={`w-11 h-13 py-3 flex items-center justify-center rounded-xl border-2 text-xl font-black transition-all select-none ${value.length > i
-                            ? 'border-amber-500 bg-amber-500/20 text-amber-300'
-                            : value.length === i
-                                ? 'border-amber-500/60 bg-slate-900/60 text-transparent animate-pulse'
-                                : 'border-slate-700 bg-slate-900/30 text-transparent'
-                            }`}
+                        className={`w - 11 h - 13 py - 3 flex items - center justify - center rounded - xl border - 2 text - xl font - black transition - all select - none ${value.length > i
+                                ? 'border-amber-500 bg-amber-500/20 text-amber-300'
+                                : value.length === i
+                                    ? 'border-amber-500/60 bg-slate-900/60 text-transparent animate-pulse'
+                                    : 'border-slate-700 bg-slate-900/30 text-transparent'
+                            } `}
                     >
                         {value.length > i ? '●' : '·'}
                     </div>
@@ -259,7 +259,7 @@ const VaultLockScreen: React.FC<{
 
 // ─── Main Notes Page ──────────────────────────────────────────────────────────
 export const Notes: React.FC = () => {
-    const { notes } = useAppStore();
+    const { notes, projects } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editNote, setEditNote] = useState<Note | undefined>();
     const [viewNote, setViewNote] = useState<Note | undefined>();
@@ -276,7 +276,7 @@ export const Notes: React.FC = () => {
         if (!uid) return;
         const load = async () => {
             try {
-                const snap = await getDoc(doc(db, `apps/${APP_ID}/users`, uid));
+                const snap = await getDoc(doc(db, `apps / ${APP_ID}/users`, uid));
                 const data = snap.data();
                 setStoredPinHash(data?.vault_pin_hash || null);
             } catch {
@@ -342,6 +342,8 @@ export const Notes: React.FC = () => {
 
     const NoteCard = ({ note }: { note: Note }) => {
         const isRevealed = !note.is_secure || revealedNotes.includes(note.id);
+        const project = note.linked_project_id ? projects.find(p => p.id === note.linked_project_id) : null;
+
         return (
             <div
                 onClick={() => isRevealed && setViewNote(note)}
@@ -368,6 +370,12 @@ export const Notes: React.FC = () => {
                 {note.tags?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
                         {note.tags.map((t) => <span key={t} className="text-xs text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded-full flex items-center gap-1"><Tag size={9} />{t}</span>)}
+                    </div>
+                )}
+                {project && (
+                    <div className="mt-3 flex items-center gap-1.5 text-[10px] font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-1 rounded-md w-fit">
+                        <FolderKanban size={10} />
+                        {project.name}
                     </div>
                 )}
                 <p className="text-slate-600 text-xs mt-2">{formatDate(note.updated_at)}</p>
