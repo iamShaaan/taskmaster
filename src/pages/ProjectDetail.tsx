@@ -132,7 +132,9 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[] }> = ({ projec
                                 </span>
                             </div>
                             <span className="text-slate-400 text-xs truncate max-w-[120px]">
-                                {entry.user_name || entry.user_email?.split('@')[0] || 'Unknown'}
+                                {entry.user_id === auth.currentUser?.uid
+                                    ? (auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Me')
+                                    : (entry.user_name || entry.user_email?.split('@')[0] || project.members?.find(m => m.uid === entry.user_id)?.email?.split('@')[0] || (entry.user_id === project.owner_id ? 'Owner' : 'Unknown'))}
                             </span>
                             <span className="text-slate-500 text-xs text-right whitespace-nowrap">{dateLabel}</span>
                             <span className={`text-xs font-mono font-bold text-right whitespace-nowrap ${entry.is_active ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -371,7 +373,7 @@ export const ProjectDetail: React.FC = () => {
                                         <a href={f.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
                                             <ExternalLink size={14} />
                                         </a>
-                                        {isOwner && (
+                                        {(isOwner || isAdmin || isModerator) && (
                                             <button onClick={() => handleDeleteFile(f.id, f.url)} title="Delete file" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
                                                 <Trash2 size={14} />
                                             </button>

@@ -61,10 +61,12 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({ onClose, editMeeting }
         setLoading(true);
         try {
             let participant_uids: string[] = editMeeting?.participant_uids || [];
+            let project_member_uids: string[] = [];
             if (form.linked_project_id) {
                 const proj = projects.find(p => p.id === form.linked_project_id);
                 if (proj) {
                     participant_uids = Array.from(new Set([...participant_uids, proj.owner_id, ...(proj.member_uids || [])]));
+                    project_member_uids = proj.member_uids || [];
                 }
             }
 
@@ -73,6 +75,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({ onClose, editMeeting }
                 start_time: start,
                 end_time: end,
                 participant_uids,
+                project_member_uids,
                 linked_task_id: form.linked_task_id || null,
                 linked_client_id: form.linked_client_id || null,
                 linked_project_id: form.linked_project_id || null,
