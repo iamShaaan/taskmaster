@@ -74,6 +74,7 @@ export interface Meeting {
     end_time: Date;
     participants: string[];
     participant_uids?: string[];
+    project_member_uids?: string[];
     linked_task_id: string | null;
     linked_client_id: string | null;
     linked_project_id: string | null;
@@ -81,6 +82,7 @@ export interface Meeting {
     created_at: Date;
     location?: string;
     outcome?: 'ended' | 'success' | 'failed'; // status set after meeting ends
+    owner_id?: string;
 }
 
 

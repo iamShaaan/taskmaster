@@ -24,8 +24,31 @@ import { ArchivePage } from './pages/ArchivePage';
 import { MyTeams } from './pages/MyTeams';
 
 const DataLoader: React.FC = () => {
-  const { setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
+  const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
   const { user } = useAuth();
+
+  // Auto-heal meetings with mismatched project members
+  useEffect(() => {
+    if (!user || meetings.length === 0 || projects.length === 0) return;
+
+    meetings.forEach((m) => {
+      // Only heal meetings owned by the current user to prevent race conditions
+      if (m.linked_project_id && m.owner_id === user.uid) {
+        const proj = projects.find(p => p.id === m.linked_project_id);
+        if (proj) {
+          const pUids = proj.member_uids || [];
+          const mUids = m.project_member_uids || [];
+          const hasMismatch = pUids.length !== mUids.length || !pUids.every(uid => mUids.includes(uid));
+
+          if (hasMismatch) {
+            import('./firebase/firestore').then(({ updateDocById }) => {
+              updateDocById('meetings', m.id, { project_member_uids: pUids }).catch(console.error);
+            });
+          }
+        }
+      }
+    });
+  }, [meetings, projects, user]);
 
   useEffect(() => {
     if (!user) return;

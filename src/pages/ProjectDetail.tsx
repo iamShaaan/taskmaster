@@ -567,6 +567,19 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
                 await batch.commit();
             }
 
+            // 3. Sync Meetings
+            const meetingsQuery = query(collection(db, `apps/${APP_ID}/meetings`), where('linked_project_id', '==', project.id));
+            const meetingsSnap = await getDocs(meetingsQuery);
+            if (!meetingsSnap.empty) {
+                const batch = writeBatch(db);
+                meetingsSnap.docs.forEach(d => {
+                    batch.update(doc(db, `apps/${APP_ID}/meetings`, d.id), {
+                        project_member_uids: updatedMemberUids
+                    });
+                });
+                await batch.commit();
+            }
+
             setUserCode(''); setSelectedMember('');
             toast.success(`Added ${found.displayName || emailLabel || 'member'} as ${role}`);
         } catch (err) {
@@ -599,6 +612,19 @@ const TeamMembers: React.FC<{ project: Project }> = ({ project }) => {
                 const batch = writeBatch(db);
                 tasksSnap.docs.forEach(d => {
                     batch.update(doc(db, `apps/${APP_ID}/tasks`, d.id), {
+                        project_member_uids: updatedMemberUids
+                    });
+                });
+                await batch.commit();
+            }
+
+            // 3. Sync Meetings
+            const meetingsQuery = query(collection(db, `apps/${APP_ID}/meetings`), where('linked_project_id', '==', project.id));
+            const meetingsSnap = await getDocs(meetingsQuery);
+            if (!meetingsSnap.empty) {
+                const batch = writeBatch(db);
+                meetingsSnap.docs.forEach(d => {
+                    batch.update(doc(db, `apps/${APP_ID}/meetings`, d.id), {
                         project_member_uids: updatedMemberUids
                     });
                 });
