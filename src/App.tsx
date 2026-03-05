@@ -22,7 +22,6 @@ import { UserDataLayout } from './components/layout/UserDataLayout';
 import { TeamMembers } from './pages/TeamMembers';
 import { ArchivePage } from './pages/ArchivePage';
 import { MyTeams } from './pages/MyTeams';
-import DebugStop from './pages/DebugStop';
 
 const DataLoader: React.FC = () => {
   const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -233,7 +232,6 @@ function App() {
 
             <Route path="notes" element={<Notes />} />
             <Route path="files" element={<Files />} />
-            <Route path="debug-stop" element={<DebugStop />} />
             <Route path="*" element={<Dashboard />} />
           </Route>
         )}
