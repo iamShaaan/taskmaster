@@ -157,15 +157,20 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[]; viewMode: 'ac
                                                         (pe.task_id === entry.task_id && pe.duration_ms === entry.duration_ms) ? { ...pe, is_archived: !entry.is_archived } : pe
                                                     );
                                                     await updateDocById('projects', project.id, { time_entries: updated });
-                                                } else if (entry.task_id) {
+                                                }
+
+                                                if (entry.task_id) {
                                                     const taskRef = doc(db, `apps/${APP_ID}/tasks`, entry.task_id);
                                                     const snap = await getDoc(taskRef);
                                                     const tD = snap.data();
                                                     if (tD && tD.time_logs) {
-                                                        const updated = tD.time_logs.map((tl: any) =>
-                                                            (tl.duration_ms === entry.duration_ms) ? { ...tl, is_archived: !entry.is_archived } : tl
-                                                        );
-                                                        await updateDoc(taskRef, { time_logs: updated });
+                                                        const hasLog = tD.time_logs.some((tl: any) => tl.duration_ms === entry.duration_ms);
+                                                        if (hasLog) {
+                                                            const updated = tD.time_logs.map((tl: any) =>
+                                                                (tl.duration_ms === entry.duration_ms) ? { ...tl, is_archived: !entry.is_archived } : tl
+                                                            );
+                                                            await updateDoc(taskRef, { time_logs: updated });
+                                                        }
                                                     }
                                                 }
                                                 toast.success(entry.is_archived ? 'Record unarchived' : 'Record archived');
