@@ -223,11 +223,13 @@ function App() {
               <Route index element={<Clients />} />
               <Route path="clients/:id" element={<ClientDetail />} />
               <Route path="team" element={<TeamMembers />} />
-              <Route path="my-teams" element={<MyTeams />} />
-              <Route path="notes" element={<Notes />} />
-              <Route path="files" element={<Files />} />
               <Route path="archive" element={<ArchivePage />} />
+              <Route path="my-teams" element={<MyTeams />} />
             </Route>
+
+            <Route path="notes" element={<Notes />} />
+            <Route path="files" element={<Files />} />
+            <Route path="*" element={<Dashboard />} />
           </Route>
         )}
       </Routes>
