@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tag, Calendar, Play, Square, Timer, Pencil, Trash2, Loader2, Users, FolderKanban } from 'lucide-react';
+import { Tag, Calendar, Play, Square, Timer, Pencil, Trash2, Loader2, Users, FolderKanban, Archive, ArchiveRestore } from 'lucide-react';
 import type { Task } from '../../types';
 import { statusBadge, priorityBadge, typeBadge } from '../ui/Badge';
 import { formatDuration, formatDate, isOverdue } from '../../utils/timeFormat';
@@ -54,6 +54,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
         }
     };
 
+    const handleArchiveToggle = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            await updateDocById('tasks', task.id, { is_archived: !task.is_archived });
+            toast.success(task.is_archived ? 'Task unarchived' : 'Task archived');
+        } catch (err) {
+            toast.error('Failed to change archive status');
+        }
+    };
+
     const totalMs = task.total_time_ms + (isRunning ? elapsed : 0);
 
     return (
@@ -81,7 +91,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, compact = fals
                         {task.title}
                     </button>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                <div className="flex items-center gap-1 transition-all">
+                    {canInteract && (
+                        <button onClick={(e) => handleArchiveToggle(e)} className={`p-1.5 rounded-lg transition-all ${task.is_archived ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`} title={task.is_archived ? "Unarchive Task" : "Archive Task"}>
+                            {task.is_archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                        </button>
+                    )}
                     {canInteract && (
                         <button onClick={() => onEdit(task)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all">
                             <Pencil size={14} />

@@ -9,7 +9,8 @@ import { TaskCard } from '../components/tasks/TaskCard';
 import { statusBadge } from '../components/ui/Badge';
 import { formatDate, formatDuration } from '../utils/timeFormat';
 import { useDropzone } from 'react-dropzone';
-import { auth } from '../firebase/config';
+import { auth, db, APP_ID } from '../firebase/config';
+import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
@@ -140,12 +141,44 @@ const ProjectTimeLogs: React.FC<{ project: Project; tasks: Task[]; viewMode: 'ac
                                     : (entry.user_name || entry.user_email?.split('@')[0] || project.members?.find(m => m.uid === entry.user_id)?.email?.split('@')[0] || (entry as any).assignee_name || ((entry as any).assignee_email)?.split('@')[0] || (entry.user_id === project.owner_id ? 'Owner' : 'Unknown'))}
                             </span>
                             <span className="text-slate-500 text-xs text-right whitespace-nowrap">{dateLabel}</span>
-                            <div className="flex items-center gap-1 justify-end">
+                            <div className="flex items-center gap-3 justify-end">
                                 <span className={`text-xs font-mono font-bold text-right whitespace-nowrap ${entry.is_active ? 'text-emerald-400' : 'text-amber-400'}`}>
                                     {entry.is_active ? (
                                         <span className="flex items-center justify-end gap-1"><Timer size={12} className="animate-spin-slow" /> Running...</span>
                                     ) : formatDuration(entry.duration_ms)}
                                 </span>
+                                {!entry.is_active && (
+                                    <button
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            try {
+                                                if (entry.task_id && project.time_entries?.some((pe: any) => pe.task_id === entry.task_id && pe.duration_ms === entry.duration_ms)) {
+                                                    const updated = (project.time_entries || []).map((pe: any) =>
+                                                        (pe.task_id === entry.task_id && pe.duration_ms === entry.duration_ms) ? { ...pe, is_archived: !entry.is_archived } : pe
+                                                    );
+                                                    await updateDocById('projects', project.id, { time_entries: updated });
+                                                } else if (entry.task_id) {
+                                                    const taskRef = doc(db, `apps/${APP_ID}/tasks`, entry.task_id);
+                                                    const snap = await getDoc(taskRef);
+                                                    const tD = snap.data();
+                                                    if (tD && tD.time_logs) {
+                                                        const updated = tD.time_logs.map((tl: any) =>
+                                                            (tl.duration_ms === entry.duration_ms) ? { ...tl, is_archived: !entry.is_archived } : tl
+                                                        );
+                                                        await updateDoc(taskRef, { time_logs: updated });
+                                                    }
+                                                }
+                                                toast.success(entry.is_archived ? 'Record unarchived' : 'Record archived');
+                                            } catch (err) {
+                                                toast.error('Failed to update archive status');
+                                            }
+                                        }}
+                                        className={`p-1.5 rounded-lg transition-all ${entry.is_archived ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`}
+                                        title={entry.is_archived ? "Unarchive record" : "Archive record"}
+                                    >
+                                        {entry.is_archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     );
@@ -197,7 +230,7 @@ const ProjectNotes: React.FC<{ project: Project; viewMode: 'active' | 'archive' 
                         </div>
                         <button
                             onClick={(e) => handleToggleArchive(e, note)}
-                            className="p-1.5 text-slate-600 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all rounded"
+                            className={`p-1.5 rounded-lg transition-all ${note.is_archived ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`}
                             title={viewMode === 'archive' ? "Unarchive Note" : "Archive Note"}
                         >
                             {viewMode === 'archive' ? <ArchiveRestore size={16} /> : <Archive size={16} />}
@@ -423,10 +456,10 @@ export const ProjectDetail: React.FC = () => {
                                                         const updatedFiles = (project.files || []).map(pf => pf.id === f.id ? { ...pf, is_archived: !f.is_archived } : pf);
                                                         await updateDocById('projects', project.id, { files: updatedFiles });
                                                     } catch (err) { }
-                                                }} className="p-1.5 text-slate-500 hover:text-amber-400 transition-colors" title={viewMode === 'archive' ? "Unarchive file" : "Archive file"}>
+                                                }} className={`p-1.5 rounded-lg transition-all ${f.is_archived ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`} title={viewMode === 'archive' ? "Unarchive file" : "Archive file"}>
                                                     {viewMode === 'archive' ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                                                 </button>
-                                                <button onClick={() => handleDeleteFile(f.id, f.url)} title="Delete file" className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
+                                                <button onClick={() => handleDeleteFile(f.id, f.url)} title="Delete file" className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
                                                     <Trash2 size={14} />
                                                 </button>
                                             </>
@@ -502,12 +535,12 @@ export const ProjectDetail: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
-                                        <ExternalLink size={14} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                        <ExternalLink size={14} className="text-slate-600 hover:text-slate-400 transition-all mr-2" />
                                         <button onClick={async (e) => {
                                             e.stopPropagation();
                                             await updateDocById('meetings', m.id, { is_archived: !m.is_archived });
-                                        }} className="p-2 text-slate-600 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all" title={viewMode === 'archive' ? "Unarchive meeting" : "Archive meeting"}>
-                                            {viewMode === 'archive' ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                                        }} className={`p-1.5 rounded-lg transition-all ${m.is_archived ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`} title={viewMode === 'archive' ? "Unarchive meeting" : "Archive meeting"}>
+                                            {m.is_archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                                         </button>
                                     </div>
                                 </div>
