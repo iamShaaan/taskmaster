@@ -31,12 +31,16 @@ export const useTimer = (task: Task) => {
         const now = new Date();
         const user = auth.currentUser;
 
+        const activeTimerData: any = {
+            start: now,
+            user_id: user?.uid || 'unknown'
+        };
+        if (user?.displayName || user?.email) {
+            activeTimerData.user_name = user.displayName || user.email;
+        }
+
         await updateDocById('tasks', task.id, {
-            active_timer: {
-                start: now,
-                user_id: user?.uid || 'unknown',
-                user_name: user?.displayName || user?.email || undefined
-            }
+            active_timer: activeTimerData
         });
     }, [isRunning, task.id]);
 
@@ -48,14 +52,14 @@ export const useTimer = (task: Task) => {
 
         const user = auth.currentUser;
 
-        const newLog = {
+        const newLog: any = {
             start: new Date(startTimeMs),
             end: endTime,
             duration_ms,
-            user_id: user?.uid,
-            user_name: user?.displayName || user?.email || undefined,
-            user_email: user?.email || undefined
+            user_id: user?.uid || 'unknown'
         };
+        if (user?.displayName || user?.email) newLog.user_name = user.displayName || user.email;
+        if (user?.email) newLog.user_email = user.email;
 
         const updatedLogs = [...(task.time_logs || []), newLog];
         const totalMs = updatedLogs.reduce((acc, l) => acc + l.duration_ms, 0);
@@ -70,17 +74,18 @@ export const useTimer = (task: Task) => {
         // If this task belongs to a project, append a time entry to the project doc
         if (task.project_id) {
             const dateStr = new Date(startTimeMs).toISOString().split('T')[0];
-            const newEntry = {
+            const newEntry: any = {
                 task_id: task.id,
                 task_title: task.title || 'Task',
                 date: dateStr,
                 start: new Date(startTimeMs),
                 end: endTime,
                 duration_ms,
-                user_id: user?.uid,
-                user_name: user?.displayName || user?.email || undefined,
-                user_email: user?.email || undefined
+                user_id: user?.uid || 'unknown'
             };
+            if (user?.displayName || user?.email) newEntry.user_name = user.displayName || user.email;
+            if (user?.email) newEntry.user_email = user.email;
+
             const ref = doc(db, `apps/${APP_ID}/projects`, task.project_id);
             await updateDoc(ref, { time_entries: arrayUnion(newEntry) });
         }
