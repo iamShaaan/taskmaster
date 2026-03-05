@@ -22,6 +22,7 @@ import { UserDataLayout } from './components/layout/UserDataLayout';
 import { TeamMembers } from './pages/TeamMembers';
 import { ArchivePage } from './pages/ArchivePage';
 import { MyTeams } from './pages/MyTeams';
+import { DebugScript2 } from './pages/DebugScript2';
 
 const DataLoader: React.FC = () => {
   const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -69,6 +70,9 @@ const DataLoader: React.FC = () => {
           start: toDate(l.start) || new Date(),
           end: toDate(l.end) || new Date(),
           duration_ms: l.duration_ms as number,
+          user_id: l.user_id,
+          user_name: l.user_name,
+          user_email: l.user_email,
         })),
         notes: (d.notes || []).map((n: any) => ({
           ...n,
@@ -218,6 +222,7 @@ function App() {
             <Route path="meetings" element={<Meetings />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
+            <Route path="debug2" element={<DebugScript2 />} />
 
             <Route path="user-data" element={<UserDataLayout />}>
               <Route index element={<Clients />} />
