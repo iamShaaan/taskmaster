@@ -20,6 +20,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
     const { clients, projects } = useAppStore();
     const [noteContent, setNoteContent] = React.useState('');
     const [submittingNote, setSubmittingNote] = React.useState(false);
+    const [isTransferring, setIsTransferring] = React.useState(false);
+    const [transferProjectId, setTransferProjectId] = React.useState('');
+    const [transferring, setTransferring] = React.useState(false);
 
     const clientName = task.client_id ? clients.find(c => c.id === task.client_id)?.name : null;
     const projectName = task.project_id ? projects.find(p => p.id === task.project_id)?.name : null;
@@ -59,6 +62,30 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
         }
     };
 
+    const handleTransfer = async () => {
+        setTransferring(true);
+        try {
+            const proj = projects.find(p => p.id === transferProjectId);
+            const isUser = task.assignee_id === uid;
+            const isProjMem = proj?.members?.some(m => m.uid === task.assignee_id);
+            const newAssigneeId = isUser || isProjMem ? task.assignee_id : null;
+
+            const taskRef = doc(db, `apps/${APP_ID}/tasks`, task.id);
+            await updateDoc(taskRef, {
+                project_id: transferProjectId || null,
+                project_member_uids: proj ? proj.member_uids : [],
+                assignee_id: newAssigneeId
+            });
+            toast.success('Task transferred');
+            setIsTransferring(false);
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to transfer task');
+        } finally {
+            setTransferring(false);
+        }
+    };
+
     if (typeof document === 'undefined') return null;
 
     return createPortal(
@@ -83,7 +110,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
                     {/* Header Strip */}
                     <div className={`h-2 w-full ${task.status === 'done' ? 'bg-emerald-500' :
                         task.status === 'in_progress' ? 'bg-indigo-500' :
-                            task.status === 'error' ? 'bg-red-500' : 'bg-slate-600'
+                            task.status === 'overdue' ? 'bg-red-500' : 'bg-slate-600'
                         }`} />
 
                     {/* Header Content */}
@@ -137,9 +164,33 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, onClos
                                     <FolderKanban size={14} className="text-amber-400" />
                                     <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Project</span>
                                 </div>
-                                <p className="text-sm font-medium text-slate-200 truncate">
-                                    {projectName || 'None'}
-                                </p>
+                                {isTransferring ? (
+                                    <div className="flex flex-col gap-2 mt-1.5">
+                                        <select
+                                            className="w-full bg-slate-900 border border-slate-700 text-slate-300 rounded p-1 text-xs focus:outline-none focus:border-amber-500"
+                                            value={transferProjectId}
+                                            onChange={e => setTransferProjectId(e.target.value)}
+                                        >
+                                            <option value="">— No project —</option>
+                                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                        </select>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={handleTransfer} disabled={transferring} className="flex-1 py-1 bg-amber-500 text-slate-900 font-bold text-[10px] rounded hover:bg-amber-600 disabled:opacity-50">Save</button>
+                                            <button onClick={() => setIsTransferring(false)} className="flex-1 py-1 bg-slate-800 text-slate-300 font-bold text-[10px] rounded hover:bg-slate-700">Cancel</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-medium text-slate-200 truncate">
+                                            {projectName || 'None'}
+                                        </p>
+                                        {(isOwner || isAssignee) && (
+                                            <button onClick={() => { setTransferProjectId(task.project_id || ''); setIsTransferring(true); }} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 px-2 py-0.5 rounded bg-amber-500/10 transition-colors">
+                                                Transfer
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Due Date */}
