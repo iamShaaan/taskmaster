@@ -2,7 +2,7 @@ import React from 'react';
 import {
     User, Globe, Building2,
     Zap, Clock, CheckCircle2, Camera, FileSignature, Save, Loader2,
-    Edit3, Mail, ExternalLink, X, Plus, Layout
+    Edit3, Mail, ExternalLink, X, Plus, Layout, Trash2
 } from 'lucide-react';
 import type { UserProfile } from '../types';
 
@@ -263,10 +263,21 @@ export const EditView: React.FC<EditViewProps> = ({
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="relative group">
-                            <div className="w-24 h-24 rounded-2xl bg-slate-950 border border-white/5 overflow-hidden">
-                                {profile.photoURL ? <img src={profile.photoURL} alt="p" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-800"><User size={32} /></div>}
+                            <div className="w-24 h-24 rounded-2xl bg-slate-950 border border-white/5 overflow-hidden relative">
+                                {profile.photoURL ? (
+                                    <>
+                                        <img src={profile.photoURL} alt="p" className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={(e) => { e.preventDefault(); setProfile(p => ({ ...p, photoURL: '' })); }}
+                                            className="absolute top-1 right-1 p-1 bg-red-500/80 rounded-lg hover:bg-red-500 transition-all opacity-0 group-hover:opacity-100 backdrop-blur-sm"
+                                            title="Remove Avatar"
+                                        >
+                                            <Trash2 size={12} className="text-white" />
+                                        </button>
+                                    </>
+                                ) : <div className="w-full h-full flex items-center justify-center text-slate-800"><User size={32} /></div>}
                             </div>
-                            <label className="absolute -bottom-1 -right-1 p-2 bg-indigo-500 rounded-xl cursor-pointer hover:bg-indigo-600 transition-all">
+                            <label className="absolute -bottom-1 -right-1 p-2 bg-indigo-500 rounded-xl cursor-pointer hover:bg-indigo-600 transition-all z-10">
                                 <Camera size={14} className="text-white" />
                                 <input type="file" className="hidden" accept="image/*" onChange={(e) => onFileUpload(e, 'photo')} />
                             </label>
@@ -285,10 +296,21 @@ export const EditView: React.FC<EditViewProps> = ({
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="relative group">
-                            <div className="w-24 h-24 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-center overflow-hidden">
-                                {profile.signatureURL ? <img src={profile.signatureURL} alt="s" className="w-full h-full object-contain invert" /> : <div className="text-slate-900"><FileSignature size={32} /></div>}
+                            <div className="w-24 h-24 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-center overflow-hidden relative">
+                                {profile.signatureURL ? (
+                                    <>
+                                        <img src={profile.signatureURL} alt="s" className="w-full h-full object-contain invert" />
+                                        <button
+                                            onClick={(e) => { e.preventDefault(); setProfile(p => ({ ...p, signatureURL: '' })); }}
+                                            className="absolute top-1 right-1 p-1 bg-red-500/80 rounded-lg hover:bg-red-500 transition-all opacity-0 group-hover:opacity-100 backdrop-blur-sm"
+                                            title="Remove Signature"
+                                        >
+                                            <Trash2 size={12} className="text-white" />
+                                        </button>
+                                    </>
+                                ) : <div className="text-slate-900"><FileSignature size={32} /></div>}
                             </div>
-                            <label className="absolute -bottom-1 -right-1 p-2 bg-indigo-500 rounded-xl cursor-pointer hover:bg-indigo-600 transition-all">
+                            <label className="absolute -bottom-1 -right-1 p-2 bg-indigo-500 rounded-xl cursor-pointer hover:bg-indigo-600 transition-all z-10">
                                 <Plus size={14} className="text-white" />
                                 <input type="file" className="hidden" accept="image/png" onChange={(e) => onFileUpload(e, 'signature')} />
                             </label>

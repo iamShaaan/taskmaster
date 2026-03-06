@@ -46,7 +46,8 @@ export const useTimer = (task: Task) => {
         }
 
         await updateDocById('tasks', task.id, {
-            active_timer: activeTimerData
+            active_timer: activeTimerData,
+            status: 'in_progress'
         });
     }, [isRunning, task.id]);
 
