@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Plus, Phone, Mail, Building2, Pencil, Trash2, FileArchive, ChevronDown, ChevronUp, ExternalLink, Globe } from 'lucide-react';
 import { useAppStore } from '../store';
 import { ClientForm } from '../components/clients/ClientForm';
+import { ClientDetailsModal } from '../components/clients/ClientDetailsModal';
 import { Modal } from '../components/ui/Modal';
 import type { Client } from '../types';
 import { deleteDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
 
 export const Clients: React.FC = () => {
-    const navigate = useNavigate();
     const { clients } = useAppStore();
     const [showForm, setShowForm] = useState(false);
     const [editClient, setEditClient] = useState<Client | undefined>();
+    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<string | null>(null);
     const [search, setSearch] = useState('');
 
@@ -56,7 +56,7 @@ export const Clients: React.FC = () => {
                                 <div className="flex-1 min-w-0">
                                     <h3
                                         className="text-slate-100 font-medium hover:text-indigo-400 cursor-pointer transition-colors"
-                                        onClick={() => navigate(`/clients/${client.id}`)}
+                                        onClick={() => setSelectedClientId(client.id)}
                                     >
                                         {client.name}
                                     </h3>
@@ -89,7 +89,7 @@ export const Clients: React.FC = () => {
                                     )}
                                     <div className="flex items-center gap-1 ml-2">
                                         <button
-                                            onClick={() => navigate(`/clients/${client.id}`)}
+                                            onClick={() => setSelectedClientId(client.id)}
                                             className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-lg transition-all"
                                             title="View Details"
                                         >
@@ -157,6 +157,12 @@ export const Clients: React.FC = () => {
             <Modal isOpen={showForm} onClose={() => { setEditClient(undefined); setShowForm(false); }} title={editClient ? 'Edit Client' : 'Add Client'} size="lg">
                 <ClientForm onClose={() => { setEditClient(undefined); setShowForm(false); }} editClient={editClient} />
             </Modal>
+
+            <ClientDetailsModal
+                isOpen={!!selectedClientId}
+                onClose={() => setSelectedClientId(null)}
+                clientId={selectedClientId}
+            />
         </div>
     );
 };

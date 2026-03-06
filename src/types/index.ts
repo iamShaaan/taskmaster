@@ -156,7 +156,7 @@ export interface UserProfile {
     bio?: string;
     companyName?: string;
     companyDescription?: string;
-    teamMembers?: { uid?: string; user_code?: string; name?: string; email: string; phone?: string; }[];
+    teamMembers?: { uid?: string; user_code?: string; name?: string; email: string; phone?: string; whatsappNumber?: string; }[];
     productivityScore?: number;
     lastCalculated?: Date;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, APP_ID } from '../firebase/config';
 import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { Users, Mail, X, UserPlus, Hash, User as UserIcon, ShieldAlert, Crown } from 'lucide-react';
+import { Users, Mail, X, UserPlus, Hash, User as UserIcon, ShieldAlert, Crown, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { UserProfile } from '../types';
 import { useOutletContext } from 'react-router-dom';
@@ -16,6 +16,7 @@ export const TeamMembers: React.FC = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [userCode, setUserCode] = useState('');
+    const [whatsappNumber, setWhatsappNumber] = useState('');
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
@@ -50,12 +51,13 @@ export const TeamMembers: React.FC = () => {
         setName('');
         setEmail('');
         setUserCode('');
+        setWhatsappNumber('');
         setShowForm(false);
         setEditingIdx(null);
     };
 
     const saveTeamMember = async () => {
-        if (!name.trim() && !email.trim() && !userCode.trim()) {
+        if (!name.trim() && !email.trim() && !userCode.trim() && !whatsappNumber.trim()) {
             toast.error('Please fill in at least one field');
             return;
         }
@@ -63,6 +65,7 @@ export const TeamMembers: React.FC = () => {
         const trimmedEmail = email.trim().toLowerCase();
         const trimmedCode = userCode.trim().toUpperCase();
         const trimmedName = name.trim();
+        const trimmedWhatsapp = whatsappNumber.trim();
 
         // Duplicate check (exclude current if editing)
         const isDuplicate = profile.teamMembers?.some((m, idx) => {
@@ -88,6 +91,7 @@ export const TeamMembers: React.FC = () => {
                 name: trimmedName,
                 email: trimmedEmail,
                 user_code: trimmedCode,
+                whatsappNumber: trimmedWhatsapp,
             };
 
             let newMembers = [...(profile.teamMembers || [])];
@@ -120,6 +124,7 @@ export const TeamMembers: React.FC = () => {
         setName(member.name || '');
         setEmail(member.email || '');
         setUserCode(member.user_code || '');
+        setWhatsappNumber(member.whatsappNumber || '');
         setEditingIdx(idx);
         setShowForm(true);
     };
@@ -170,7 +175,7 @@ export const TeamMembers: React.FC = () => {
                         <UserPlus size={14} className="text-emerald-400" />
                         {editingIdx !== null ? 'Edit Team Member' : 'Add New Team Member'}
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="relative">
                             <UserIcon size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
                             <input
@@ -200,11 +205,21 @@ export const TeamMembers: React.FC = () => {
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveTeamMember(); } }}
                             />
                         </div>
+                        <div className="relative">
+                            <Phone size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
+                            <input
+                                className="w-full bg-slate-900 border border-white/5 rounded-2xl px-5 py-3.5 pl-11 text-white outline-none focus:border-emerald-500/50 transition-all text-sm font-medium"
+                                placeholder="WhatsApp (+1...)"
+                                value={whatsappNumber}
+                                onChange={(e) => setWhatsappNumber(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveTeamMember(); } }}
+                            />
+                        </div>
                     </div>
                     <div className="flex justify-end">
                         <button
                             onClick={saveTeamMember}
-                            disabled={saving || (!name.trim() && !email.trim() && !userCode.trim())}
+                            disabled={saving || (!name.trim() && !email.trim() && !userCode.trim() && !whatsappNumber.trim())}
                             className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white px-8 py-3 rounded-2xl font-black transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-sm flex items-center gap-2"
                         >
                             {saving ? 'Saving...' : (editingIdx !== null ? 'Update Member' : 'Save Member')}
@@ -245,6 +260,14 @@ export const TeamMembers: React.FC = () => {
                                             {member.user_code && (
                                                 <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
                                                     {member.user_code}
+                                                </span>
+                                            )}
+                                            {member.whatsappNumber && (
+                                                <span className="text-slate-700 text-[10px]">·</span>
+                                            )}
+                                            {member.whatsappNumber && (
+                                                <span className="text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                                                    <Phone size={10} /> {member.whatsappNumber}
                                                 </span>
                                             )}
                                         </div>
