@@ -13,7 +13,7 @@ import { Auth } from './pages/Auth';
 import { useAuth } from './hooks/useAuth';
 import { listenCollection, orderBy, toDate, where } from './firebase/firestore';
 import { useAppStore } from './store';
-import type { Task, Meeting, Client, Project, Note } from './types';
+import type { Task, Meeting, Client, Project, Note, Routine, DailyLog } from './types';
 import { Sparkles } from 'lucide-react';
 
 import { ClientDetail } from './pages/ClientDetail';
@@ -22,10 +22,11 @@ import { UserDataLayout } from './components/layout/UserDataLayout';
 import { TeamMembers } from './pages/TeamMembers';
 import { ArchivePage } from './pages/ArchivePage';
 import { TimeTracker } from './pages/TimeTracker';
+import { RoutinePage } from './pages/RoutinePage';
 import { NotificationProvider } from './components/notifications/NotificationProvider';
 
 const DataLoader: React.FC = () => {
-  const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
+  const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes, setRoutines, setDailyLogs } = useAppStore();
   const { user } = useAuth();
 
   // Auto-heal meetings with mismatched project members
@@ -179,8 +180,23 @@ const DataLoader: React.FC = () => {
       updateProjects();
     }, where('member_uids', 'array-contains', user.uid)));
 
+    // Routines & Daily Logs (Private to user)
+    unsubs.push(listenCollection('routines', (data) => {
+      setRoutines(data.filter(d => !d.deleted_at && !d.is_archived).map(d => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date()
+      } as unknown as Routine)));
+    }, where('owner_id', '==', user.uid)));
+
+    unsubs.push(listenCollection('daily_logs', (data) => {
+      setDailyLogs(data.map(d => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date()
+      } as unknown as DailyLog)));
+    }, where('owner_id', '==', user.uid)));
+
     return () => unsubs.forEach((u) => u());
-  }, [user, setTasks, setMeetings, setClients, setProjects, setNotes]);
+  }, [user, setTasks, setMeetings, setClients, setProjects, setNotes, setRoutines, setDailyLogs]);
 
   return null;
 };
@@ -223,6 +239,7 @@ function App() {
               <Route path="meetings" element={<Meetings />} />
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:id" element={<ProjectDetail />} />
+              <Route path="routine" element={<RoutinePage />} />
 
               <Route path="user-data" element={<UserDataLayout />}>
                 <Route index element={<Clients />} />

@@ -173,6 +173,29 @@ export interface FileAttachment {
     is_archived?: boolean;
 }
 
+export type RoutineCategory = 'body' | 'mind' | 'finance' | 'office';
+
+export interface Routine {
+    id: string;
+    title: string;
+    category: RoutineCategory;
+    time: string; // e.g., "08:00"
+    owner_id: string;
+    created_at: Date;
+    is_archived?: boolean;
+}
+
+export interface DailyLog {
+    id: string;
+    date: string; // Format: "YYYY-MM-DD"
+    routine_id?: string;
+    completed?: boolean;
+    spent?: number;
+    earned?: number;
+    owner_id: string;
+    created_at?: Date;
+}
+
 export interface N8nAction {
     action_type: string;
     payload: Record<string, unknown>;

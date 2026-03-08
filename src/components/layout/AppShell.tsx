@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/notes': 'Notes & Vault',
     '/files': 'Files',
     '/profile': 'My Profile',
+    '/routine': 'Daily Routine',
 };
 
 export const AppShell: React.FC = () => {

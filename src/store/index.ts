@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Task, Meeting, Client, Project, Note, FileAttachment } from '../types';
+import type { Task, Meeting, Client, Project, Note, FileAttachment, Routine, DailyLog } from '../types';
 
 interface AppStore {
     // Tasks
@@ -26,6 +26,13 @@ interface AppStore {
     // Files
     files: FileAttachment[];
     setFiles: (files: FileAttachment[]) => void;
+
+    // Daily Routine & Checklist
+    routines: Routine[];
+    setRoutines: (routines: Routine[]) => void;
+
+    dailyLogs: DailyLog[];
+    setDailyLogs: (logs: DailyLog[]) => void;
 
     // UI state
     sidebarOpen: boolean;
@@ -58,6 +65,12 @@ export const useAppStore = create<AppStore>((set) => ({
 
     files: [],
     setFiles: (files) => set({ files }),
+
+    routines: [],
+    setRoutines: (routines) => set({ routines }),
+
+    dailyLogs: [],
+    setDailyLogs: (dailyLogs) => set({ dailyLogs }),
 
     sidebarOpen: true,
     setSidebarOpen: (open) => set({ sidebarOpen: open }),
