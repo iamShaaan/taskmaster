@@ -173,7 +173,7 @@ export interface FileAttachment {
     is_archived?: boolean;
 }
 
-export type RoutineCategory = 'body' | 'mind' | 'finance' | 'office';
+export type RoutineCategory = 'body' | 'mind' | 'finance' | 'office' | 'fun';
 
 export interface Routine {
     id: string;

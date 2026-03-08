@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { format } from 'date-fns';
 import { 
     Plus, Activity, BrainCircuit, DollarSign, Briefcase, 
-    CheckCircle2, Circle, Clock, TrendingUp, Sparkles, Loader2 
+    CheckCircle2, Circle, Clock, TrendingUp, Sparkles, Loader2, Gamepad2 
 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { RoutineForm } from '../components/routine/RoutineForm';
@@ -18,6 +18,7 @@ const CATEGORY_ICONS: Record<RoutineCategory, React.ElementType> = {
     mind: BrainCircuit,
     finance: DollarSign,
     office: Briefcase,
+    fun: Gamepad2,
 };
 
 const CATEGORY_COLORS: Record<RoutineCategory, { bg: string; text: string; border: string; label: string }> = {
@@ -25,6 +26,7 @@ const CATEGORY_COLORS: Record<RoutineCategory, { bg: string; text: string; borde
     mind: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', label: 'Mind' },
     finance: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', label: 'Finance' },
     office: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', label: 'Office' },
+    fun: { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', label: 'Fun' },
 };
 
 export const RoutinePage: React.FC = () => {
@@ -379,6 +381,16 @@ export const RoutinePage: React.FC = () => {
                                 </div>
                                 <h3 className="text-indigo-400 font-bold mb-2">Office & Productivity</h3>
                                 <p className="text-slate-400 text-sm">Plan your most critical work tasks, emails, and meetings to keep your career moving forward.</p>
+                            </div>
+                        )}
+
+                        {activeTab === 'fun' && (
+                            <div className="bg-slate-800/50 border border-pink-500/20 rounded-2xl p-5 text-center">
+                                <div className="p-3 bg-pink-500/10 rounded-full inline-flex mb-3">
+                                    <Gamepad2 size={24} className="text-pink-400" />
+                                </div>
+                                <h3 className="text-pink-400 font-bold mb-2">Fun & Recreation</h3>
+                                <p className="text-slate-400 text-sm">Schedule time for gaming, hobbies, and pure enjoyment. Resting is productive too.</p>
                             </div>
                         )}
                     </div>
