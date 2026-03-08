@@ -57,7 +57,11 @@ export const RoutinePage: React.FC = () => {
     const activeRoutines = useMemo(() => {
         return routines
             .filter(r => !r.is_archived)
-            .sort((a, b) => a.start_time.localeCompare(b.start_time));
+            .sort((a, b) => {
+                const timeA = a.start_time || (a as any).time || '00:00';
+                const timeB = b.start_time || (b as any).time || '00:00';
+                return timeA.localeCompare(timeB);
+            });
     }, [routines]);
 
     // Derived stats
@@ -348,7 +352,7 @@ export const RoutinePage: React.FC = () => {
                                             <div className="flex items-center gap-3 mt-1">
                                                 <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium">
                                                     <Clock size={12} />
-                                                    {routine.start_time} - {routine.end_time}
+                                                    {routine.start_time || (routine as any).time || 'No time'} {routine.end_time ? `- ${routine.end_time}` : ''}
                                                 </div>
                                                 <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${catColor.bg} ${catColor.text}`}>
                                                     <CatIcon size={10} />
