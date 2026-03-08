@@ -80,15 +80,15 @@ export const Tasks: React.FC = () => {
                     />
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <select className="bg-slate-900/50 border border-slate-700/50 text-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 cursor-pointer hover:bg-slate-800/80 transition-all" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 custom-scrollbar">
+                    <select className="bg-slate-900/50 border border-slate-700/50 text-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 cursor-pointer hover:bg-slate-800/80 transition-all flex-shrink-0" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                         <option value="all">📁 All Types</option>
                         <option value="personal">👤 Personal</option>
                         <option value="project">🚀 Project</option>
                         <option value="client">🤝 Client</option>
                     </select>
 
-                    <select className="bg-slate-900/50 border border-slate-700/50 text-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 cursor-pointer hover:bg-slate-800/80 transition-all" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+                    <select className="bg-slate-900/50 border border-slate-700/50 text-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 cursor-pointer hover:bg-slate-800/80 transition-all flex-shrink-0" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
                         <option value="all">⚡ All Priorities</option>
                         <option value="high">🔴 High</option>
                         <option value="medium">🟡 Medium</option>
@@ -109,7 +109,7 @@ export const Tasks: React.FC = () => {
 
                 <button
                     onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
+                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95 w-full sm:w-auto justify-center sm:justify-start mt-2 sm:mt-0"
                 >
                     <Plus size={18} strokeWidth={3} /> NEW TASK
                 </button>
@@ -118,7 +118,7 @@ export const Tasks: React.FC = () => {
             {/* Kanban View */}
             {view === 'kanban' && (
                 <DragDropContext onDragEnd={onDragEnd}>
-                    <div className="flex-1 flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-x-hidden md:overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                         {STATUS_COLUMNS.map(({ key, label, color }, idx) => {
                             const isOverdue = (t: Task) => t.due_date && new Date(t.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                             const colTasks = filtered.filter((t) => {
@@ -132,7 +132,7 @@ export const Tasks: React.FC = () => {
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: idx * 0.1 }}
-                                    className="flex flex-col gap-4 min-w-[280px] sm:min-w-[320px] max-w-[280px] sm:max-w-[320px]"
+                                    className="flex flex-col gap-4 w-full md:min-w-[320px] md:max-w-[320px]"
                                 >
                                     <div className={`flex items-center justify-between p-3 rounded-t-xl bg-slate-800/30 border-b-2 ${color.replace('border-', 'border-b-').replace('600', '400')}`}>
                                         <div className="flex items-center gap-2">
@@ -149,7 +149,7 @@ export const Tasks: React.FC = () => {
                                             <div
                                                 {...provided.droppableProps}
                                                 ref={provided.innerRef}
-                                                className="flex flex-col gap-4 flex-1 overflow-y-auto max-h-[calc(100vh-320px)] pr-2 custom-scrollbar min-h-[150px]"
+                                                className="flex flex-col gap-4 flex-1 h-[400px] md:h-auto overflow-y-auto md:max-h-[calc(100vh-320px)] pr-2 custom-scrollbar min-h-[150px]"
                                             >
                                                 <AnimatePresence mode="popLayout">
                                                     {colTasks.map((task, index) => (

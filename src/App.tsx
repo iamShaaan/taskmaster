@@ -21,7 +21,8 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { UserDataLayout } from './components/layout/UserDataLayout';
 import { TeamMembers } from './pages/TeamMembers';
 import { ArchivePage } from './pages/ArchivePage';
-import { MyTeams } from './pages/MyTeams';
+import { TimeTracker } from './pages/TimeTracker';
+import { NotificationProvider } from './components/notifications/NotificationProvider';
 
 const DataLoader: React.FC = () => {
   const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes } = useAppStore();
@@ -203,39 +204,41 @@ function App() {
   return (
     <BrowserRouter>
       {user && <DataLoader />}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' },
-          success: { iconTheme: { primary: '#10b981', secondary: '#1e293b' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: '#1e293b' } },
-        }}
-      />
-      <Routes>
-        {!user ? (
-          <Route path="*" element={<Auth />} />
-        ) : (
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<Dashboard />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="meetings" element={<Meetings />} />
-            <Route path="projects" element={<Projects />} />
-            <Route path="projects/:id" element={<ProjectDetail />} />
+      <NotificationProvider>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' },
+            success: { iconTheme: { primary: '#10b981', secondary: '#1e293b' } },
+            error: { iconTheme: { primary: '#ef4444', secondary: '#1e293b' } },
+          }}
+        />
+        <Routes>
+          {!user ? (
+            <Route path="*" element={<Auth />} />
+          ) : (
+            <Route path="/" element={<AppShell />}>
+              <Route index element={<Dashboard />} />
+              <Route path="tasks" element={<Tasks />} />
+              <Route path="meetings" element={<Meetings />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="projects/:id" element={<ProjectDetail />} />
 
-            <Route path="user-data" element={<UserDataLayout />}>
-              <Route index element={<Clients />} />
-              <Route path="clients/:id" element={<ClientDetail />} />
-              <Route path="team" element={<TeamMembers />} />
-              <Route path="archive" element={<ArchivePage />} />
-              <Route path="my-teams" element={<MyTeams />} />
+              <Route path="user-data" element={<UserDataLayout />}>
+                <Route index element={<Clients />} />
+                <Route path="clients/:id" element={<ClientDetail />} />
+                <Route path="team" element={<TeamMembers />} />
+                <Route path="archive" element={<ArchivePage />} />
+                <Route path="time-tracker" element={<TimeTracker />} />
+                <Route path="notes" element={<Notes />} />
+                <Route path="files" element={<Files />} />
+              </Route>
+
+              <Route path="*" element={<Dashboard />} />
             </Route>
-
-            <Route path="notes" element={<Notes />} />
-            <Route path="files" element={<Files />} />
-            <Route path="*" element={<Dashboard />} />
-          </Route>
-        )}
-      </Routes>
+          )}
+        </Routes>
+      </NotificationProvider>
     </BrowserRouter>
   );
 }

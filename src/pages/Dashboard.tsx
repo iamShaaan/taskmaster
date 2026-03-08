@@ -86,10 +86,21 @@ export const Dashboard: React.FC = () => {
 
     const recentTasks = useMemo(() => tasks.slice(0, 6), [tasks]);
 
-    const totalTrackedMs = useMemo(
-        () => tasks.reduce((acc, t) => acc + (t.total_time_ms || 0), 0),
-        [tasks]
-    );
+    const totalTrackedTodayMs = useMemo(() => {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        let total = 0;
+        tasks.forEach(task => {
+            if (task.time_logs) {
+                task.time_logs.forEach(log => {
+                    const logStart = new Date(log.start).getTime();
+                    if (logStart >= startOfToday) {
+                        total += log.duration_ms;
+                    }
+                });
+            }
+        });
+        return total;
+    }, [tasks, now]);
 
     const activeProjects = useMemo(() => projects.filter(p => p.status === 'active'), [projects]);
 
@@ -139,10 +150,10 @@ export const Dashboard: React.FC = () => {
                 <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 sm:p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <Timer size={15} className="text-emerald-400" />
-                        <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Time Tracked</span>
+                        <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Time Tracked Today</span>
                     </div>
-                    <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-2 tracking-tight">{formatDuration(totalTrackedMs)}</p>
-                    <p className="text-slate-600 text-xs mt-1">across all tasks</p>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-2 tracking-tight">{formatDuration(totalTrackedTodayMs)}</p>
+                    <p className="text-slate-600 text-xs mt-1">across all tasks today</p>
                 </div>
 
                 {/* Completion rate */}

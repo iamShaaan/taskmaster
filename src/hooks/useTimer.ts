@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import { arrayUnion, doc, updateDoc, writeBatch, collection } from 'firebase/firestore';
 import { updateDocById } from '../firebase/firestore';
 import { db, APP_ID, auth } from '../firebase/config';
 import type { Task } from '../types';
+import { formatDuration } from '../utils/timeFormat';
 
 export const useTimer = (task: Task) => {
     const isRunning = !!task.active_timer;
@@ -49,7 +50,28 @@ export const useTimer = (task: Task) => {
             active_timer: activeTimerData,
             status: 'in_progress'
         });
-    }, [isRunning, task.id]);
+
+        // Notify teammates
+        const members = task.project_member_uids || [];
+        if (members.length > 1) {
+            const batch = writeBatch(db);
+            members.forEach(memberId => {
+                if (memberId !== user?.uid) {
+                    const notifRef = doc(collection(db, `apps/${APP_ID}/notifications`));
+                    batch.set(notifRef, {
+                        user_id: memberId,
+                        title: 'Timer Started',
+                        body: `${user?.displayName || 'A teammate'} started working on: ${task.title}`,
+                        type: 'activity',
+                        read: false,
+                        created_at: now,
+                        related_entity_id: task.id
+                    });
+                }
+            });
+            try { await batch.commit(); } catch (e) { console.error(e); }
+        }
+    }, [isRunning, task]);
 
     const stop = useCallback(async () => {
         if (!isRunning || !timerStartTime) return;
@@ -102,7 +124,28 @@ export const useTimer = (task: Task) => {
             const ref = doc(db, `apps/${APP_ID}/projects`, task.project_id);
             await updateDoc(ref, { time_entries: arrayUnion(newEntry) });
         }
-    }, [isRunning, timerStartTime, task.time_logs, task.id, task.project_id, task.title]);
+
+        // Notify teammates
+        const members = task.project_member_uids || [];
+        if (members.length > 1) {
+            const batch = writeBatch(db);
+            members.forEach(memberId => {
+                if (memberId !== user?.uid) {
+                    const notifRef = doc(collection(db, `apps/${APP_ID}/notifications`));
+                    batch.set(notifRef, {
+                        user_id: memberId,
+                        title: 'Timer Stopped',
+                        body: `${user?.displayName || 'A teammate'} stopped working on: ${task.title}. Logged ${formatDuration(duration_ms)}`,
+                        type: 'activity',
+                        read: false,
+                        created_at: endTime,
+                        related_entity_id: task.id
+                    });
+                }
+            });
+            try { await batch.commit(); } catch (e) { console.error(e); }
+        }
+    }, [isRunning, timerStartTime, task]);
 
     return { isRunning, elapsed, start, stop };
 };

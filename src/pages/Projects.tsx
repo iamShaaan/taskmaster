@@ -77,11 +77,11 @@ export const Projects: React.FC = () => {
 
                                 {project.description && <p className="text-slate-400 text-sm mb-3 line-clamp-2">{project.description}</p>}
 
-                                <div className="flex items-center gap-2 mb-4">
+                                <div className="flex flex-wrap items-center gap-2 mb-4">
                                     {statusBadge(project.status)}
                                     {priorityBadge(project.priority || 'medium')}
                                     {project.client_id && (
-                                        <span className="text-xs text-slate-400 bg-slate-800/50 border border-slate-700/50 px-2 py-0.5 rounded uppercase tracking-wide font-medium truncate max-w-[120px]">
+                                        <span className="text-xs text-slate-400 bg-slate-800/50 border border-slate-700/50 px-2 py-0.5 rounded uppercase tracking-wide font-medium truncate max-w-[150px]">
                                             {clients.find(c => c.id === project.client_id)?.name || 'Unknown Client'}
                                         </span>
                                     )}

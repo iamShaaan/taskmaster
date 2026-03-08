@@ -180,3 +180,16 @@ export interface N8nAction {
     result: unknown;
     created_at: Date;
 }
+
+export interface AppNotification {
+    id: string;
+    user_id: string;
+    title: string;
+    body: string;
+    type: 'activity' | 'reminder' | 'deadline' | 'system';
+    read: boolean;
+    created_at: Date;
+    link?: string;
+    related_entity_id?: string;
+}
+

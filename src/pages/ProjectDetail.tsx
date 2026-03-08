@@ -228,13 +228,13 @@ const ProjectNotes: React.FC<{ project: Project; viewMode: 'active' | 'archive' 
 
     return (
         <section className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4">
                 <h2 className="text-slate-100 font-bold flex items-center gap-2">
                     <FileText size={18} className="text-blue-400" /> Project Notes
                 </h2>
                 <button
                     onClick={() => { setEditNote(undefined); setShowForm(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 text-xs font-bold rounded-lg transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 text-xs font-bold rounded-lg transition-all self-start sm:self-auto"
                 >
                     <Plus size={14} /> New Note
                 </button>
@@ -497,14 +497,14 @@ export const ProjectDetail: React.FC = () => {
                 <div className="lg:col-span-2 space-y-8">
                     {/* Tasks */}
                     <section>
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4">
                             <h2 className="text-slate-100 font-bold flex items-center gap-2 text-lg">
                                 <CheckSquare size={18} className="text-indigo-400" /> Project Tasks
                             </h2>
                             {isAdmin && (
                                 <button
                                     onClick={() => { setEditTask(undefined); setShowTaskForm(true); }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 self-start sm:self-auto"
                                 >
                                     <Plus size={14} /> Add Task
                                 </button>

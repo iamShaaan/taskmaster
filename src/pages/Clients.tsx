@@ -49,7 +49,7 @@ export const Clients: React.FC = () => {
                 <div className="space-y-3">
                     {filtered.map((client) => (
                         <div key={client.id} className="bg-slate-800 border border-slate-700/50 rounded-xl overflow-hidden hover:border-indigo-500/30 transition-all">
-                            <div className="flex items-center gap-4 p-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                                     {client.name.charAt(0).toUpperCase()}
                                 </div>
@@ -76,7 +76,7 @@ export const Clients: React.FC = () => {
                                     </div>
                                     {client.description && <p className="text-slate-500 text-xs mt-1 line-clamp-2">{client.description}</p>}
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                                     {client.phones?.length > 0 && (
                                         <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                                             <Phone size={10} />{client.phones.length}
@@ -102,7 +102,7 @@ export const Clients: React.FC = () => {
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
-                                    <button onClick={() => setExpanded(expanded === client.id ? null : client.id)} className="p-1.5 text-slate-500 hover:text-slate-300 rounded-lg transition-all">
+                                    <button onClick={() => setExpanded(expanded === client.id ? null : client.id)} className="ml-auto sm:ml-0 p-1.5 text-slate-500 hover:text-slate-300 rounded-lg transition-all">
                                         {expanded === client.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                     </button>
                                 </div>

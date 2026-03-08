@@ -102,7 +102,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, on
                     <div className="flex flex-wrap justify-center md:justify-start gap-3">
                         <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
                             <div className="p-1.5 bg-amber-500/20 rounded-lg"><Clock size={16} className="text-amber-400" /></div>
-                            <span className="text-slate-200 font-black">{stats.timeDelivered}h <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Logs</span></span>
+                            <span className="text-slate-200 font-black">{stats.timeDelivered}h <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest ml-1">Tracked All-Time</span></span>
                         </div>
                         <div className="bg-slate-950/40 border border-white/10 px-5 py-2.5 rounded-2xl flex items-center gap-3">
                             <div className="p-1.5 bg-emerald-500/20 rounded-lg"><CheckCircle2 size={16} className="text-emerald-400" /></div>
