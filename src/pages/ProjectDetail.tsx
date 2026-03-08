@@ -14,6 +14,7 @@ import { updateDoc, doc, getDoc } from 'firebase/firestore';
 import { uploadFile, deleteFile } from '../firebase/storage';
 import { updateDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
+import { triggerDownload } from '../utils/file';
 import type { Project, ProjectTimeEntry, Task, Note } from '../types';
 
 // ─── Time Records Section ──────────────────────────────────────────────────────
@@ -461,9 +462,13 @@ export const ProjectDetail: React.FC = () => {
                                         <span className="text-slate-300 text-xs truncate max-w-[120px]">{f.name}</span>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
-                                        <a href={f.url} download={f.name} title="Download file" className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors" onClick={e => e.stopPropagation()}>
+                                        <button 
+                                            onClick={() => triggerDownload(f.url, f.name)} 
+                                            title="Download file" 
+                                            className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
+                                        >
                                             <Download size={14} />
-                                        </a>
+                                        </button>
                                         <a href={f.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
                                             <ExternalLink size={14} />
                                         </a>

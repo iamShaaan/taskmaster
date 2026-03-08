@@ -2,112 +2,139 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper functions ───────────────────────────────────────────────────
+    // ─── Helper functions ────────────────────────────────────────────────────
     function isAuthed() {
       return request.auth != null;
     }
+
     function isOwner(resource) {
-      return isAuthed() && resource != null && resource.data.owner_id == request.auth.uid;
+      return isAuthed()
+        && resource != null
+        && resource.data.owner_id == request.auth.uid;
     }
-    // Docs with null/missing owner_id are "orphaned" — allow any authed user
-    // to claim/update/delete them (covers test docs created without auth context)
+
     function isOrphan(resource) {
-      return isAuthed() && resource != null
+      return isAuthed()
+        && resource != null
         && (!('owner_id' in resource.data) || resource.data.owner_id == null);
     }
 
-    // ─── User Profiles ──────────────────────────────────────────────────────
-    match /apps/{appId}/users/{userId} {
-      allow read: if isAuthed();
+    // =========================================================================
+    // TASK MASTER  (apps/task-master-v1/...)
+    // Explicit, per-collection rules. Isolated from other apps by the path.
+    // =========================================================================
+
+    // ── User Profiles ─────────────────────────────────────────────────────────
+    match /apps/task-master-v1/users/{userId} {
+      allow read:  if isAuthed();
       allow write: if isAuthed() && request.auth.uid == userId;
     }
 
-    // ─── Invitations (legacy) ───────────────────────────────────────────────
-    match /apps/{appId}/invitations/{token} {
-      allow read: if true;
+    // ── Invitations ───────────────────────────────────────────────────────────
+    match /apps/task-master-v1/invitations/{token} {
+      allow read:           if true;
       allow create, update: if isAuthed();
     }
 
-    // ─── Projects (role-based) ──────────────────────────────────────────────
-    match /apps/{appId}/projects/{docId} {
-      // Owner: full control
-      allow read, write, delete: if isOwner(resource);
+    // ── Projects ──────────────────────────────────────────────────────────────
+    match /apps/task-master-v1/projects/{docId} {
+      // CREATE — resource is null at creation time, so we allow any authed user
+      allow create: if isAuthed();
 
-      // Orphaned docs (no owner_id): any authed user can manage
-      allow read, write, delete: if isOrphan(resource);
+      // READ — owner, orphan, or any named member role
+      allow read: if isOwner(resource)
+                  || isOrphan(resource)
+                  || (isAuthed() && resource != null && resource.data.admin_uids is list
+                      && request.auth.uid in resource.data.admin_uids)
+                  || (isAuthed() && resource != null && resource.data.moderator_uids is list
+                      && request.auth.uid in resource.data.moderator_uids)
+                  || (isAuthed() && resource != null && resource.data.viewer_uids is list
+                      && request.auth.uid in resource.data.viewer_uids)
+                  || (isAuthed() && resource != null && resource.data.member_uids is list
+                      && request.auth.uid in resource.data.member_uids);
 
-      // Admin members: full control
-      allow read, write, delete: if isAuthed()
-        && resource != null
-        && resource.data.admin_uids is list
-        && request.auth.uid in resource.data.admin_uids;
+      // UPDATE — owner, orphan, admin, or moderator
+      allow update: if isOwner(resource)
+                    || isOrphan(resource)
+                    || (isAuthed() && resource != null && resource.data.admin_uids is list
+                        && request.auth.uid in resource.data.admin_uids)
+                    || (isAuthed() && resource != null && resource.data.moderator_uids is list
+                        && request.auth.uid in resource.data.moderator_uids);
 
-      // Moderator members: read + create + update (NO delete)
-      allow read, create, update: if isAuthed()
-        && resource != null
-        && resource.data.moderator_uids is list
-        && request.auth.uid in resource.data.moderator_uids;
-
-      // Viewer members: read only
-      allow read: if isAuthed()
-        && resource != null
-        && resource.data.viewer_uids is list
-        && request.auth.uid in resource.data.viewer_uids;
-
-      // Any member_uids member: read
-      allow read: if isAuthed()
-        && resource != null
-        && resource.data.member_uids is list
-        && request.auth.uid in resource.data.member_uids;
-
-      // Create new project
-      allow create: if isAuthed() && resource == null;
+      // DELETE — owner or admin only
+      allow delete: if isOwner(resource)
+                    || isOrphan(resource)
+                    || (isAuthed() && resource != null && resource.data.admin_uids is list
+                        && request.auth.uid in resource.data.admin_uids);
     }
 
-    // ─── Tasks (assignee can update) ──────────────────────────────────────────
-    match /apps/{appId}/tasks/{docId} {
-      // Owner: full access
-      allow read, write, delete: if isOwner(resource);
+    // ── Tasks ─────────────────────────────────────────────────────────────────
+    match /apps/task-master-v1/tasks/{docId} {
+      // CREATE — any authed user; owner_id is stamped by the client
+      allow create: if isAuthed();
 
-      // Orphaned docs
-      allow read, write, delete: if isOrphan(resource);
-
-      // Assignee: can read + update (NOT delete)
-      allow read, update: if isAuthed()
-        && resource != null
-        && resource.data.assignee_id == request.auth.uid;
-
-      // Project members: can read tasks in their project
-      allow read: if isAuthed()
-        && resource != null
-        && resource.data.project_member_uids is list
-        && request.auth.uid in resource.data.project_member_uids;
-
-      // Any authenticated user can read (for shared contexts)
+      // READ — any authed user (tasks can be shared across projects)
       allow read: if isAuthed();
 
-      // Create new tasks
-      allow create: if isAuthed() && resource == null;
+      // UPDATE — owner, orphan, or assignee
+      allow update: if isOwner(resource)
+                    || isOrphan(resource)
+                    || (isAuthed() && resource != null
+                        && resource.data.assignee_id == request.auth.uid);
+
+      // DELETE (hard purge) — owner or orphan only
+      allow delete: if isOwner(resource) || isOrphan(resource);
     }
 
-    // ─── All other app data (clients, notes, meetings, actions…) ─────
+    // ── Routines ──────────────────────────────────────────────────────────────
+    match /apps/task-master-v1/routines/{docId} {
+      allow create:        if isAuthed();
+      allow read:          if isAuthed();
+      allow update, delete: if isOwner(resource) || isOrphan(resource);
+    }
+
+    // ── Daily Logs ────────────────────────────────────────────────────────────
+    match /apps/task-master-v1/daily_logs/{docId} {
+      allow create:        if isAuthed();
+      allow read:          if isAuthed();
+      allow update, delete: if isOwner(resource) || isOrphan(resource);
+    }
+
+    // ── All other task-master-v1 collections (clients, notes, meetings…) ──────
+    match /apps/task-master-v1/{collection}/{docId} {
+      allow create:        if isAuthed();
+      allow read:          if isAuthed();
+      allow update, delete: if isOwner(resource) || isOrphan(resource);
+    }
+
+    // ── Collection-level list queries ─────────────────────────────────────────
+    match /apps/task-master-v1/{collection} {
+      allow list: if isAuthed();
+    }
+
+    // =========================================================================
+    // OTHER APPS (Profluencer, CRM-Tool, etc.)
+    // These rules will NOT affect task-master-v1 paths (different match prefix).
+    // When Profluencer deploys its own rules they go here, keeping TM safe.
+    // =========================================================================
+    match /apps/{appId}/users/{userId} {
+      allow read:  if isAuthed();
+      allow write: if isAuthed() && request.auth.uid == userId;
+    }
+
     match /apps/{appId}/{collection}/{docId} {
-      // Owner: full access
-      allow read, write: if isOwner(resource);
-
-      // Orphaned docs (null/missing owner_id): any authed user can manage
-      allow read, write, delete: if isOrphan(resource);
-
-      // Any authenticated user can read (for shared project tasks etc.)
-      allow read: if isAuthed();
-
-      // Create new documents
-      allow create: if isAuthed() && resource == null;
+      allow create:        if isAuthed();
+      allow read:          if isAuthed();
+      allow update, delete: if isAuthed()
+                            && (resource == null
+                                || !('owner_id' in resource.data)
+                                || resource.data.owner_id == null
+                                || resource.data.owner_id == request.auth.uid);
     }
 
-    // ─── Collection-level list ──────────────────────────────────────────────
     match /apps/{appId}/{collection} {
       allow list: if isAuthed();
     }
+
   }
 }

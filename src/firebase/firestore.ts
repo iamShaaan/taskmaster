@@ -33,6 +33,7 @@ export const createDoc = async (path: string, data: Record<string, unknown>) => 
         created_at: serverTimestamp(),
         status: data.status || 'open',
         priority: data.priority || 'medium',
+        updated_at: serverTimestamp(),
     });
     return ref.id;
 };

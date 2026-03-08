@@ -5,6 +5,7 @@ import type { FileAttachment } from '../types';
 import { doc, updateDoc, arrayRemove } from 'firebase/firestore';
 import { db, APP_ID } from '../firebase/config';
 import toast from 'react-hot-toast';
+import { triggerDownload } from '../utils/file';
 
 const getFileIcon = (type: string) => {
     if (type?.startsWith('image/')) return <Image size={16} className="text-indigo-400" />;
@@ -99,14 +100,13 @@ export const Files: React.FC = () => {
                                     <td className="px-4 py-3 text-slate-500 text-xs">{formatBytes(file.size)}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-1">
-                                            <a
-                                                href={file.url}
-                                                download={file.name}
+                                            <button
+                                                onClick={() => triggerDownload(file.url, file.name)}
                                                 title="Download"
                                                 className="p-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
                                             >
                                                 <Download size={14} />
-                                            </a>
+                                            </button>
                                             <a href={file.url} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors">
                                                 <ExternalLink size={14} />
                                             </a>

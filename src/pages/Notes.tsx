@@ -45,7 +45,7 @@ const PinDots: React.FC<{ value: string; inputRef: React.RefObject<HTMLInputElem
                 {[0, 1, 2, 3, 4, 5].map(i => (
                     <div
                         key={i}
-                        className={`w - 11 h - 13 py - 3 flex items - center justify - center rounded - xl border - 2 text - xl font - black transition - all select - none ${value.length > i
+                        className={`w-11 h-13 py-3 flex items-center justify-center rounded-xl border-2 text-xl font-black transition-all select-none ${value.length > i
                                 ? 'border-amber-500 bg-amber-500/20 text-amber-300'
                                 : value.length === i
                                     ? 'border-amber-500/60 bg-slate-900/60 text-transparent animate-pulse'
@@ -276,7 +276,7 @@ export const Notes: React.FC = () => {
         if (!uid) return;
         const load = async () => {
             try {
-                const snap = await getDoc(doc(db, `apps / ${APP_ID}/users`, uid));
+                const snap = await getDoc(doc(db, `apps/${APP_ID}/users`, uid));
                 const data = snap.data();
                 setStoredPinHash(data?.vault_pin_hash || null);
             } catch {
