@@ -21,7 +21,6 @@ const navItems = [
     { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { to: '/meetings', icon: Calendar, label: 'Meetings' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
-    { to: '/clients', icon: Users, label: 'Clients' },
     { to: '/user-data', icon: Users, label: 'User Data' },
 ];
 

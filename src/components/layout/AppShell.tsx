@@ -65,7 +65,7 @@ export const AppShell: React.FC = () => {
                                     setShowNotifications(!showNotifications);
                                     if (!permissionGranted) requestPermission();
                                 }}
-                                className={`p-2 rounded-lg transition-all duration-200 relative hidden sm:flex ${showNotifications ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 hover:shadow-[0_0_12px_rgba(99,102,241,0.15)]'}`}
+                                className={`p-2 rounded-lg transition-all duration-200 relative flex ${showNotifications ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 hover:shadow-[0_0_12px_rgba(99,102,241,0.15)]'}`}
                             >
                                 <Bell size={18} />
                                 {unreadCount > 0 && (
