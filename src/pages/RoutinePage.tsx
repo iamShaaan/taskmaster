@@ -330,7 +330,7 @@ export const RoutinePage: React.FC = () => {
                                         initial={{ opacity: 0, scale: 0.98 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.98 }}
-                                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${
+                                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group ${
                                             isCompleted 
                                                 ? 'bg-slate-800/40 border-slate-700/50' 
                                                 : `bg-slate-800/80 border-slate-700 hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5`
