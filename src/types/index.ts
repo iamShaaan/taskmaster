@@ -179,7 +179,9 @@ export interface Routine {
     id: string;
     title: string;
     category: RoutineCategory;
-    time: string; // e.g., "08:00"
+    start_time: string; // e.g., "08:00"
+    end_time: string; // e.g., "09:00"
+    linked_task_id?: string | null;
     owner_id: string;
     created_at: Date;
     is_archived?: boolean;

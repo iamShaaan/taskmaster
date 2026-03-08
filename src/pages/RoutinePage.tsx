@@ -5,13 +5,13 @@ import { useAuth } from '../hooks/useAuth';
 import { format } from 'date-fns';
 import { 
     Plus, Activity, BrainCircuit, DollarSign, Briefcase, 
-    CheckCircle2, Circle, Clock, TrendingUp, Sparkles, Loader2, Gamepad2 
+    CheckCircle2, Circle, Clock, TrendingUp, Sparkles, Loader2, Gamepad2, Edit2, Trash2 
 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { RoutineForm } from '../components/routine/RoutineForm';
-import { createDoc, updateDocById } from '../firebase/firestore';
+import { createDoc, updateDocById, deleteDocById } from '../firebase/firestore';
 import toast from 'react-hot-toast';
-import type { RoutineCategory } from '../types';
+import type { RoutineCategory, Routine } from '../types';
 
 const CATEGORY_ICONS: Record<RoutineCategory, React.ElementType> = {
     body: Activity,
@@ -30,9 +30,10 @@ const CATEGORY_COLORS: Record<RoutineCategory, { bg: string; text: string; borde
 };
 
 export const RoutinePage: React.FC = () => {
-    const { routines, dailyLogs } = useAppStore();
+    const { routines, dailyLogs, tasks } = useAppStore();
     const { user } = useAuth();
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [routineToEdit, setRoutineToEdit] = useState<Routine | null>(null);
     
     // Active Tab state
     const [activeTab, setActiveTab] = useState<RoutineCategory | 'all'>('all');
@@ -56,7 +57,7 @@ export const RoutinePage: React.FC = () => {
     const activeRoutines = useMemo(() => {
         return routines
             .filter(r => !r.is_archived)
-            .sort((a, b) => a.time.localeCompare(b.time));
+            .sort((a, b) => a.start_time.localeCompare(b.start_time));
     }, [routines]);
 
     // Derived stats
@@ -99,6 +100,24 @@ export const RoutinePage: React.FC = () => {
         }
     };
 
+    const handleDeleteRoutine = async (e: React.MouseEvent, routineId: string) => {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this routine?')) return;
+        try {
+            await deleteDocById('routines', routineId);
+            toast.success('Routine deleted');
+        } catch (error) {
+            console.error('Error deleting routine:', error);
+            toast.error('Failed to delete routine');
+        }
+    };
+
+    const handleEditRoutine = (e: React.MouseEvent, routine: Routine) => {
+        e.stopPropagation();
+        setRoutineToEdit(routine);
+        setIsFormOpen(true);
+    };
+
     const handleSaveFinance = async () => {
         if (!user) return;
         setIsSavingFinance(true);
@@ -128,9 +147,40 @@ export const RoutinePage: React.FC = () => {
         }
     };
 
+    const handleDragStart = (e: React.DragEvent, taskId: string, taskTitle: string) => {
+        e.dataTransfer.setData('taskId', taskId);
+        e.dataTransfer.setData('taskTitle', taskTitle);
+    };
+
+    const handleDropOnTimeline = (e: React.DragEvent) => {
+        e.preventDefault();
+        const taskId = e.dataTransfer.getData('taskId');
+        const taskTitle = e.dataTransfer.getData('taskTitle');
+        if (taskId && taskTitle) {
+            // Open the routine form with the task details pre-filled
+            setRoutineToEdit({
+                title: taskTitle,
+                linked_task_id: taskId,
+                category: 'office',
+                start_time: '09:00',
+                end_time: '10:00'
+            } as any);
+            setIsFormOpen(true);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
     const displayGroup = activeTab === 'all' 
         ? activeRoutines 
         : activeRoutines.filter(r => r.category === activeTab);
+
+    // Filter open/in-progress tasks for the Office sidebar
+    const activeTasks = useMemo(() => {
+        return tasks.filter(t => t.status === 'open' || t.status === 'in_progress');
+    }, [tasks]);
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 animate-fade-in pb-10">
@@ -144,7 +194,10 @@ export const RoutinePage: React.FC = () => {
                     <p className="text-slate-400 text-sm mt-1">{displayDate} • {activeRoutines.length} items scheduled</p>
                 </div>
                 <button
-                    onClick={() => setIsFormOpen(true)}
+                    onClick={() => {
+                        setRoutineToEdit(null);
+                        setIsFormOpen(true);
+                    }}
                     className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all flex items-center justify-center gap-2"
                 >
                     <Plus size={18} />
@@ -235,7 +288,17 @@ export const RoutinePage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Routine List */}
-                <div className={`col-span-1 ${activeTab === 'all' ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-3`}>
+                <div 
+                    className={`col-span-1 ${activeTab === 'all' ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-3 p-4 rounded-xl border border-transparent transition-colors ${activeTab === 'office' ? 'border-dashed border-indigo-500/30 bg-slate-800/20' : ''}`}
+                    onDrop={activeTab === 'office' ? handleDropOnTimeline : undefined}
+                    onDragOver={activeTab === 'office' ? handleDragOver : undefined}
+                >
+                    {activeTab === 'office' && (
+                        <div className="mb-4 flex items-center gap-2 text-indigo-400 text-sm bg-indigo-500/10 p-3 rounded-lg border border-indigo-500/20">
+                            <Briefcase size={16} />
+                            <span>Drop tasks here to schedule them in your routine</span>
+                        </div>
+                    )}
                     <AnimatePresence mode="popLayout">
                         {displayGroup.length === 0 ? (
                             <motion.div
@@ -285,13 +348,36 @@ export const RoutinePage: React.FC = () => {
                                             <div className="flex items-center gap-3 mt-1">
                                                 <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium">
                                                     <Clock size={12} />
-                                                    {routine.time}
+                                                    {routine.start_time} - {routine.end_time}
                                                 </div>
                                                 <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${catColor.bg} ${catColor.text}`}>
                                                     <CatIcon size={10} />
                                                     {catColor.label}
                                                 </div>
+                                                {routine.linked_task_id && (
+                                                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-700/50 text-slate-400">
+                                                        <Briefcase size={10} />
+                                                        Task Linked
+                                                    </div>
+                                                )}
                                             </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={(e) => handleEditRoutine(e, routine)}
+                                                className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                                                title="Edit Routine"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => handleDeleteRoutine(e, routine.id)}
+                                                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                                title="Delete Routine"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     </motion.div>
                                 );
@@ -375,12 +461,42 @@ export const RoutinePage: React.FC = () => {
                         )}
 
                         {activeTab === 'office' && (
-                            <div className="bg-slate-800/50 border border-indigo-500/20 rounded-2xl p-5 text-center">
-                                <div className="p-3 bg-indigo-500/10 rounded-full inline-flex mb-3">
-                                    <Briefcase size={24} className="text-indigo-400" />
+                            <div className="flex flex-col h-full bg-slate-800/30 border border-indigo-500/20 rounded-2xl overflow-hidden">
+                                <div className="p-4 border-b border-slate-700/50 bg-slate-800/80">
+                                    <h3 className="text-indigo-400 font-bold flex items-center gap-2">
+                                        <Briefcase size={18} />
+                                        Task Backlog
+                                    </h3>
+                                    <p className="text-slate-400 text-xs mt-1">Drag tasks to the timeline to schedule them.</p>
                                 </div>
-                                <h3 className="text-indigo-400 font-bold mb-2">Office & Productivity</h3>
-                                <p className="text-slate-400 text-sm">Plan your most critical work tasks, emails, and meetings to keep your career moving forward.</p>
+                                
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar max-h-[500px]">
+                                    {activeTasks.length === 0 ? (
+                                        <div className="text-center p-6 text-slate-500 text-sm">
+                                            No active tasks found in projects.
+                                        </div>
+                                    ) : (
+                                        activeTasks.map(task => (
+                                            <div
+                                                key={task.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, task.id, task.title)}
+                                                className="p-3 bg-slate-800 border border-slate-700 rounded-xl cursor-grab active:cursor-grabbing hover:border-indigo-500/50 hover:shadow-lg transition-all"
+                                            >
+                                                <p className="text-sm font-bold text-slate-200 mb-1">{task.title}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                                        task.priority === 'high' ? 'bg-red-500/20 text-red-400' :
+                                                        task.priority === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                                                        'bg-emerald-500/20 text-emerald-400'
+                                                    }`}>
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -398,8 +514,8 @@ export const RoutinePage: React.FC = () => {
             </div>
 
             {/* Modal for adding Routine */}
-            <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title="Add Daily Task">
-                <RoutineForm onClose={() => setIsFormOpen(false)} />
+            <Modal isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setRoutineToEdit(null); }} title={routineToEdit ? "Edit Daily Task" : "Add Daily Task"}>
+                <RoutineForm onClose={() => { setIsFormOpen(false); setRoutineToEdit(null); }} initialData={routineToEdit || undefined} />
             </Modal>
         </div>
     );

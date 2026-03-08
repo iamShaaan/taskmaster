@@ -4,11 +4,11 @@ import { Clock, Tag, Type, Loader2, Sparkles } from 'lucide-react';
 import { createDoc } from '../../firebase/firestore';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
-import type { RoutineCategory } from '../../types';
+import type { RoutineCategory, Routine } from '../../types';
 
 interface RoutineFormProps {
     onClose: () => void;
-    initialDate?: Date; // To pre-fill any context if needed
+    initialData?: Routine | Partial<Routine>;
 }
 
 const CATEGORIES: { value: RoutineCategory; label: string; color: string }[] = [
@@ -19,11 +19,12 @@ const CATEGORIES: { value: RoutineCategory; label: string; color: string }[] = [
     { value: 'fun', label: 'Fun & Gaming', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
 ];
 
-export const RoutineForm: React.FC<RoutineFormProps> = ({ onClose }) => {
+export const RoutineForm: React.FC<RoutineFormProps> = ({ onClose, initialData }) => {
     const { user } = useAuth();
-    const [title, setTitle] = useState('');
-    const [time, setTime] = useState('08:00');
-    const [category, setCategory] = useState<RoutineCategory>('office');
+    const [title, setTitle] = useState(initialData?.title || '');
+    const [startTime, setStartTime] = useState(initialData?.start_time || '08:00');
+    const [endTime, setEndTime] = useState(initialData?.end_time || '09:00');
+    const [category, setCategory] = useState<RoutineCategory>(initialData?.category || 'office');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -36,14 +37,24 @@ export const RoutineForm: React.FC<RoutineFormProps> = ({ onClose }) => {
 
         setIsSubmitting(true);
         try {
-            await createDoc('routines', {
+            const payload = {
                 title: title.trim(),
-                time,
+                start_time: startTime,
+                end_time: endTime,
                 category,
                 owner_id: user.uid,
                 is_archived: false,
-            });
-            toast.success('Routine added successfully!');
+                ...(initialData?.linked_task_id ? { linked_task_id: initialData.linked_task_id } : {})
+            };
+
+            if (initialData?.id) {
+                const { updateDocById } = await import('../../firebase/firestore');
+                await updateDocById('routines', initialData.id, payload);
+                toast.success('Routine updated successfully!');
+            } else {
+                await createDoc('routines', payload);
+                toast.success('Routine added successfully!');
+            }
             onClose();
         } catch (error) {
             console.error('Error adding routine:', error);
@@ -74,17 +85,34 @@ export const RoutineForm: React.FC<RoutineFormProps> = ({ onClose }) => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {/* Time */}
+                {/* Start Time */}
                 <div>
                     <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                        Time
+                        Start Time
                     </label>
                     <div className="relative group flex items-center">
                         <Clock size={16} className="absolute left-3 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                         <input
                             type="time"
-                            value={time}
-                            onChange={(e) => setTime(e.target.value)}
+                            value={startTime}
+                            onChange={(e) => setStartTime(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all [color-scheme:dark]"
+                            required
+                        />
+                    </div>
+                </div>
+
+                {/* End Time */}
+                <div>
+                    <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
+                        End Time
+                    </label>
+                    <div className="relative group flex items-center">
+                        <Clock size={16} className="absolute left-3 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                        <input
+                            type="time"
+                            value={endTime}
+                            onChange={(e) => setEndTime(e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all [color-scheme:dark]"
                             required
                         />
@@ -92,7 +120,7 @@ export const RoutineForm: React.FC<RoutineFormProps> = ({ onClose }) => {
                 </div>
 
                 {/* Category Selection */}
-                <div>
+                <div className="sm:col-span-2">
                     <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
                         Category
                     </label>
@@ -143,12 +171,12 @@ export const RoutineForm: React.FC<RoutineFormProps> = ({ onClose }) => {
                     {isSubmitting ? (
                         <>
                             <Loader2 size={18} className="animate-spin" />
-                            Creating...
+                            {initialData?.id ? 'Saving...' : 'Creating...'}
                         </>
                     ) : (
                         <>
                             <Sparkles size={18} />
-                            Add Routine
+                            {initialData?.id ? 'Save Changes' : 'Add Routine'}
                         </>
                     )}
                 </motion.button>
