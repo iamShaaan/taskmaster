@@ -25,18 +25,18 @@ import { TimeTracker } from './pages/TimeTracker';
 import { RoutinePage } from './pages/RoutinePage';
 import { NotificationProvider } from './components/notifications/NotificationProvider';
 
+// ─── BACKGROUND DATA LOADER ──────────────────────────────────────────────────
 const DataLoader: React.FC = () => {
-  const { meetings, projects, setTasks, setMeetings, setClients, setProjects, setNotes, setRoutines, setDailyLogs } = useAppStore();
   const { user } = useAuth();
+  const store = useAppStore();
 
-  // Auto-heal meetings with mismatched project members
+  // 1. Auto-heal meetings with mismatched project members
   useEffect(() => {
-    if (!user || meetings.length === 0 || projects.length === 0) return;
+    if (!user || store.meetings.length === 0 || store.projects.length === 0) return;
 
-    meetings.forEach((m) => {
-      // Only heal meetings owned by the current user to prevent race conditions
+    store.meetings.forEach((m) => {
       if (m.linked_project_id && m.owner_id === user.uid) {
-        const proj = projects.find(p => p.id === m.linked_project_id);
+        const proj = store.projects.find(p => p.id === m.linked_project_id);
         if (proj) {
           const pUids = proj.member_uids || [];
           const mUids = m.project_member_uids || [];
@@ -50,20 +50,26 @@ const DataLoader: React.FC = () => {
         }
       }
     });
-  }, [meetings, projects, user]);
+  }, [store.meetings, store.projects, user]);
 
+  // 2. Real-time Collections Listeners
   useEffect(() => {
     if (!user) return;
     const unsubs: (() => void)[] = [];
 
-    // Tasks state holder to merge multiple listeners without duplicate/stale issues
+    // Helper to reduce boilerplate
+    const sub = (col: string, flux: (data: any[]) => void, ...constraints: any[]) => {
+      unsubs.push(listenCollection(col, flux, ...constraints));
+    };
+
+    // --- Tasks (Complex merging for owner + assignee + shared) ---
     const tasksState = { owned: [] as any[], assigned: [] as any[], shared: [] as any[] };
     const updateTasks = () => {
       const merged = [...tasksState.owned, ...tasksState.assigned, ...tasksState.shared];
       const unique = merged.filter((t, i, a) => a.findIndex(x => x.id === t.id) === i)
         .sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0));
 
-      setTasks(unique.map((d) => ({
+      store.setTasks(unique.map((d) => ({
         ...d,
         due_date: toDate(d.due_date),
         created_at: toDate(d.created_at) || new Date(),
@@ -82,82 +88,44 @@ const DataLoader: React.FC = () => {
       } as unknown as Task)));
     };
 
-    // Personal items: Filter by owner_id
-    unsubs.push(listenCollection('tasks', (data) => {
-      tasksState.owned = data.filter(d => !d.deleted_at);
-      updateTasks();
-    }, where('owner_id', '==', user.uid)));
+    unsubs.push(listenCollection('tasks', (data) => { tasksState.owned = data.filter(d => !d.deleted_at); updateTasks(); }, where('owner_id', '==', user.uid)));
+    unsubs.push(listenCollection('tasks', (data) => { tasksState.assigned = data.filter(d => !d.deleted_at); updateTasks(); }, where('assignee_id', '==', user.uid)));
+    unsubs.push(listenCollection('tasks', (data) => { tasksState.shared = data.filter(d => !d.deleted_at); updateTasks(); }, where('project_member_uids', 'array-contains', user.uid)));
 
-    // Assigned tasks
-    unsubs.push(listenCollection('tasks', (data) => {
-      tasksState.assigned = data.filter(d => !d.deleted_at);
-      updateTasks();
-    }, where('assignee_id', '==', user.uid)));
-
-    // Shared project tasks
-    unsubs.push(listenCollection('tasks', (data) => {
-      tasksState.shared = data.filter(d => !d.deleted_at);
-      updateTasks();
-    }, where('project_member_uids', 'array-contains', user.uid)));
-
-    const meetingsState = { owned: [] as any[], shared: [] as any[], projectShared: [] as any[] };
-    const updateMeetings = () => {
-      const merged = [...meetingsState.owned, ...meetingsState.shared, ...meetingsState.projectShared];
-      const unique = merged.filter((m, i, a) => a.findIndex(x => x.id === m.id) === i)
-        .sort((a, b) => {
-          const aTime = a.start_time?.toMillis?.() || 0;
-          const bTime = b.start_time?.toMillis?.() || 0;
-          return aTime - bTime;
-        });
-
-      setMeetings(unique.map((d) => ({
+    // --- Meetings ---
+    sub('meetings', (data) => {
+      store.setMeetings(data.filter(d => !d.deleted_at).map(d => ({
         ...d,
         start_time: toDate(d.start_time as never) || new Date(),
         end_time: toDate(d.end_time as never) || new Date(),
         created_at: toDate(d.created_at as never) || new Date(),
       } as unknown as Meeting)));
-    };
+    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
 
-    unsubs.push(listenCollection('meetings', (data) => {
-      meetingsState.owned = data.filter(d => !d.deleted_at);
-      updateMeetings();
-    }, where('owner_id', '==', user.uid)));
-
-    unsubs.push(listenCollection('meetings', (data) => {
-      meetingsState.shared = data.filter(d => !d.deleted_at);
-      updateMeetings();
-    }, where('participant_uids', 'array-contains', user.uid)));
-
-    unsubs.push(listenCollection('meetings', (data) => {
-      meetingsState.projectShared = data.filter(d => !d.deleted_at);
-      updateMeetings();
-    }, where('project_member_uids', 'array-contains', user.uid)));
-
-    unsubs.push(listenCollection('notes', (data) => {
-      setNotes(data.filter(d => !d.deleted_at).map((d) => ({
+    // --- Notes ---
+    sub('notes', (data) => {
+      store.setNotes(data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date(),
         updated_at: toDate(d.updated_at as never) || new Date(),
       } as unknown as Note)));
-    }, where('owner_id', '==', user.uid), orderBy('updated_at', 'desc')));
+    }, where('owner_id', '==', user.uid), orderBy('updated_at', 'desc'));
 
-    // Clients are now private by default
-    unsubs.push(listenCollection('clients', (data) => {
-      setClients(data.filter(d => !d.deleted_at).map((d) => ({ ...d, created_at: toDate(d.created_at as never) || new Date() } as unknown as Client)));
-    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc')));
+    // --- Clients ---
+    sub('clients', (data) => {
+      store.setClients(data.filter(d => !d.deleted_at).map((d) => ({ 
+        ...d, 
+        created_at: toDate(d.created_at as never) || new Date() 
+      } as unknown as Client)));
+    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
 
-    // Projects: Visible if owner OR if user is in shared_with array
-    // Note: Firestore doesn't support 'where(OR)' easily with 'array-contains' in a single query reliably with other constraints.
-    // However, we can use a simpler approach: fetch where owner OR fetch where shared_with (though onSnapshot is per-query).
-    // Alternative: Just fetch everything and filter in-memory if team size is small, OR do two separate listeners.
-    // For now, let's use the 'shared_with' if we can, or just implement the ownership for now and then add sharing.
-    // Projects state holder
+    // --- Projects ---
     const projectsState = { owned: [] as any[], shared: [] as any[] };
     const updateProjects = () => {
       const merged = [...projectsState.owned, ...projectsState.shared];
       const unique = merged.filter((p, i, a) => a.findIndex(x => x.id === p.id) === i);
 
-      setProjects(unique.map((d) => ({
+      store.setProjects(unique.map((d) => ({
         ...d,
         created_at: toDate(d.created_at) || new Date(),
         time_logs: ((d.time_logs as any[]) || []).map((l: any) => ({
@@ -168,35 +136,27 @@ const DataLoader: React.FC = () => {
       } as unknown as Project)));
     };
 
-    // First listener: projects owned by user
-    unsubs.push(listenCollection('projects', (data) => {
-      projectsState.owned = data.filter(d => !d.deleted_at);
-      updateProjects();
-    }, where('owner_id', '==', user.uid)));
+    unsubs.push(listenCollection('projects', (data) => { projectsState.owned = data.filter(d => !d.deleted_at); updateProjects(); }, where('owner_id', '==', user.uid)));
+    unsubs.push(listenCollection('projects', (data) => { projectsState.shared = data.filter(d => !d.deleted_at); updateProjects(); }, where('member_uids', 'array-contains', user.uid)));
 
-    // Second listener: projects shared with this user (member_uids array-contains)
-    unsubs.push(listenCollection('projects', (data) => {
-      projectsState.shared = data.filter(d => !d.deleted_at);
-      updateProjects();
-    }, where('member_uids', 'array-contains', user.uid)));
-
-    // Routines & Daily Logs (Private to user)
-    unsubs.push(listenCollection('routines', (data) => {
-      setRoutines(data.filter(d => !d.deleted_at && !d.is_archived).map(d => ({
+    // --- Routines ---
+    sub('routines', (data) => {
+      store.setRoutines(data.filter(d => !d.deleted_at && !d.is_archived).map(d => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date()
       } as unknown as Routine)));
-    }, where('owner_id', '==', user.uid)));
+    }, where('owner_id', '==', user.uid));
 
-    unsubs.push(listenCollection('daily_logs', (data) => {
-      setDailyLogs(data.map(d => ({
+    // --- Daily Logs ---
+    sub('daily_logs', (data) => {
+      store.setDailyLogs(data.map(d => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date()
       } as unknown as DailyLog)));
-    }, where('owner_id', '==', user.uid)));
+    }, where('owner_id', '==', user.uid));
 
     return () => unsubs.forEach((u) => u());
-  }, [user, setTasks, setMeetings, setClients, setProjects, setNotes, setRoutines, setDailyLogs]);
+  }, [user?.uid]);
 
   return null;
 };

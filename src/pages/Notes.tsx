@@ -257,6 +257,60 @@ const VaultLockScreen: React.FC<{
     );
 };
 
+// ─── Note Card Component ───────────────────────────────────────────────────
+interface NoteCardProps {
+    note: Note;
+    projects: any[];
+    revealedNotes: string[];
+    onView: (n: Note) => void;
+    onEdit: (n: Note) => void;
+    onDelete: (id: string) => void;
+    onToggleReveal: (id: string) => void;
+}
+
+const NoteCard: React.FC<NoteCardProps> = ({ note, projects, revealedNotes, onView, onEdit, onDelete, onToggleReveal }) => {
+    const isRevealed = !note.is_secure || revealedNotes.includes(note.id);
+    const project = note.linked_project_id ? projects.find(p => p.id === note.linked_project_id) : null;
+
+    return (
+        <div
+            onClick={() => isRevealed && onView(note)}
+            className={`group bg-slate-800 border rounded-xl p-4 hover:border-indigo-500/30 transition-all ${isRevealed ? 'cursor-pointer' : ''} ${note.is_secure ? 'border-amber-500/30' : 'border-slate-700/50'}`}
+        >
+            <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                    {note.is_secure && <Lock size={13} className="text-amber-400 flex-shrink-0" />}
+                    <h3 className="text-slate-100 font-medium text-sm">{note.title}</h3>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {note.is_secure && (
+                        <button onClick={(e) => { e.stopPropagation(); onToggleReveal(note.id); }} className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg transition-all">
+                            {isRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(note); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"><Pencil size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(note.id); }} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
+                </div>
+            </div>
+            <div className={`text-slate-400 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-32 overflow-hidden ${!isRevealed ? 'blur-sm select-none' : ''}`}>
+                {note.content || <span className="text-slate-600 italic">Empty note</span>}
+            </div>
+            {note.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-3">
+                    {note.tags.map((t: string) => <span key={t} className="text-xs text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded-full flex items-center gap-1"><Tag size={9} />{t}</span>)}
+                </div>
+            )}
+            {project && (
+                <div className="mt-3 flex items-center gap-1.5 text-[10px] font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-1 rounded-md w-fit">
+                    <FolderKanban size={10} />
+                    {project.name}
+                </div>
+            )}
+            <p className="text-slate-600 text-xs mt-2">{formatDate(note.updated_at)}</p>
+        </div>
+    );
+};
+
 // ─── Main Notes Page ──────────────────────────────────────────────────────────
 export const Notes: React.FC = () => {
     const { notes, projects } = useAppStore();
@@ -287,6 +341,18 @@ export const Notes: React.FC = () => {
         };
         load();
     }, [uid]);
+
+    // Auto-heal notes missing updated_at (fixes "vanishing" issue for old notes)
+    useEffect(() => {
+        if (!uid || notes.length === 0) return;
+        notes.forEach(note => {
+            if (!note.updated_at) {
+                import('../firebase/firestore').then(({ updateDocById }) => {
+                    updateDocById('notes', note.id, { updated_at: new Date() }).catch(console.error);
+                });
+            }
+        });
+    }, [notes, uid]);
 
     const normalNotes = notes.filter((n) => !n.is_secure);
     const vaultNotes = notes.filter((n) => n.is_secure);
@@ -340,47 +406,9 @@ export const Notes: React.FC = () => {
         }
     }, [uid]);
 
-    const NoteCard = ({ note }: { note: Note }) => {
-        const isRevealed = !note.is_secure || revealedNotes.includes(note.id);
-        const project = note.linked_project_id ? projects.find(p => p.id === note.linked_project_id) : null;
-
-        return (
-            <div
-                onClick={() => isRevealed && setViewNote(note)}
-                className={`group bg-slate-800 border rounded-xl p-4 hover:border-indigo-500/30 transition-all ${isRevealed ? 'cursor-pointer' : ''} ${note.is_secure ? 'border-amber-500/30' : 'border-slate-700/50'}`}
-            >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                        {note.is_secure && <Lock size={13} className="text-amber-400 flex-shrink-0" />}
-                        <h3 className="text-slate-100 font-medium text-sm">{note.title}</h3>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {note.is_secure && (
-                            <button onClick={(e) => { e.stopPropagation(); toggleReveal(note.id); }} className="p-1.5 text-slate-500 hover:text-amber-400 rounded-lg transition-all">
-                                {isRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
-                            </button>
-                        )}
-                        <button onClick={(e) => { e.stopPropagation(); setEditNote(note); setShowForm(true); }} className="p-1.5 text-slate-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10 transition-all"><Pencil size={13} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(note.id); }} className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
-                    </div>
-                </div>
-                <div className={`text-slate-400 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-32 overflow-hidden ${!isRevealed ? 'blur-sm select-none' : ''}`}>
-                    {note.content || <span className="text-slate-600 italic">Empty note</span>}
-                </div>
-                {note.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                        {note.tags.map((t) => <span key={t} className="text-xs text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded-full flex items-center gap-1"><Tag size={9} />{t}</span>)}
-                    </div>
-                )}
-                {project && (
-                    <div className="mt-3 flex items-center gap-1.5 text-[10px] font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-1 rounded-md w-fit">
-                        <FolderKanban size={10} />
-                        {project.name}
-                    </div>
-                )}
-                <p className="text-slate-600 text-xs mt-2">{formatDate(note.updated_at)}</p>
-            </div>
-        );
+    const handleEditNote = (note: Note) => {
+        setEditNote(note);
+        setShowForm(true);
     };
 
     return (
@@ -402,7 +430,18 @@ export const Notes: React.FC = () => {
                     <div className="text-center py-10 text-slate-600 text-sm border-2 border-dashed border-slate-800 rounded-xl">No notes yet</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {filteredNormal.map((note) => <NoteCard key={note.id} note={note} />)}
+                        {filteredNormal.map((note) => (
+                            <NoteCard
+                                key={note.id}
+                                note={note}
+                                projects={projects}
+                                revealedNotes={revealedNotes}
+                                onView={setViewNote}
+                                onEdit={handleEditNote}
+                                onDelete={handleDelete}
+                                onToggleReveal={toggleReveal}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
@@ -432,7 +471,18 @@ export const Notes: React.FC = () => {
                         <div className="text-center py-8 text-slate-600 text-sm border-2 border-dashed border-amber-900/30 rounded-xl">No vault notes yet. Create a note and toggle "Vault" mode.</div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {vaultNotes.map((note) => <NoteCard key={note.id} note={note} />)}
+                            {vaultNotes.map((note) => (
+                                <NoteCard
+                                    key={note.id}
+                                    note={note}
+                                    projects={projects}
+                                    revealedNotes={revealedNotes}
+                                    onView={setViewNote}
+                                    onEdit={handleEditNote}
+                                    onDelete={handleDelete}
+                                    onToggleReveal={toggleReveal}
+                                />
+                            ))}
                         </div>
                     )
                 )}
