@@ -102,14 +102,14 @@ const DataLoader: React.FC = () => {
       } as unknown as Meeting)));
     }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
 
-    // --- Notes ---
+    // --- Notes (No orderBy yet to ensure visibility of old notes for auto-healing) ---
     sub('notes', (data) => {
       store.setNotes(data.filter(d => !d.deleted_at).map((d) => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date(),
         updated_at: toDate(d.updated_at as never) || new Date(),
       } as unknown as Note)));
-    }, where('owner_id', '==', user.uid), orderBy('updated_at', 'desc'));
+    }, where('owner_id', '==', user.uid));
 
     // --- Clients ---
     sub('clients', (data) => {
