@@ -355,16 +355,28 @@ export const Notes: React.FC = () => {
     }, [notes, uid]);
 
     const sortedNotes = [...notes].sort((a, b) => {
-        const aT = a.updated_at instanceof Date ? a.updated_at.getTime() : 0;
-        const bT = b.updated_at instanceof Date ? b.updated_at.getTime() : 0;
+        const aT = (a.updated_at instanceof Date) ? a.updated_at.getTime() : 0;
+        const bT = (b.updated_at instanceof Date) ? b.updated_at.getTime() : 0;
         return bT - aT;
     });
 
+    // --- Filter Logic ---
     const normalNotes = sortedNotes.filter((n) => !n.is_secure);
     const vaultNotes = sortedNotes.filter((n) => n.is_secure);
-    const filteredNormal = normalNotes.filter((n) =>
-        n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase())
-    );
+
+    const filteredNormal = normalNotes.filter((n) => {
+        const t = (n.title || '').toLowerCase();
+        const c = (n.content || '').toLowerCase();
+        const s = search.toLowerCase();
+        return t.includes(s) || c.includes(s);
+    });
+
+    const filteredVault = vaultNotes.filter((n) => {
+        const t = (n.title || '').toLowerCase();
+        const c = (n.content || '').toLowerCase();
+        const s = search.toLowerCase();
+        return t.includes(s) || c.includes(s);
+    });
 
     const handleDelete = async (id: string) => {
         if (!confirm('Delete this note?')) return;
@@ -473,11 +485,11 @@ export const Notes: React.FC = () => {
                         onResetPin={handleResetPin}
                     />
                 ) : (
-                    vaultNotes.length === 0 ? (
-                        <div className="text-center py-8 text-slate-600 text-sm border-2 border-dashed border-amber-900/30 rounded-xl">No vault notes yet. Create a note and toggle "Vault" mode.</div>
+                    filteredVault.length === 0 ? (
+                        <div className="text-center py-8 text-slate-600 text-sm border-2 border-dashed border-amber-900/30 rounded-xl">No vault notes found matching your search.</div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {vaultNotes.map((note) => (
+                            {filteredVault.map((note) => (
                                 <NoteCard
                                     key={note.id}
                                     note={note}

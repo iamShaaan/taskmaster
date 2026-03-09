@@ -36,75 +36,19 @@ service cloud.firestore {
       allow create, update: if isAuthed();
     }
 
-    // ── Projects ──────────────────────────────────────────────────────────────
-    match /apps/task-master-v1/projects/{docId} {
-      // CREATE — resource is null at creation time, so we allow any authed user
-      allow create: if isAuthed();
-
-      // READ — owner, orphan, or any named member role
-      allow read: if isOwner(resource)
-                  || isOrphan(resource)
-                  || (isAuthed() && resource != null && resource.data.admin_uids is list
-                      && request.auth.uid in resource.data.admin_uids)
-                  || (isAuthed() && resource != null && resource.data.moderator_uids is list
-                      && request.auth.uid in resource.data.moderator_uids)
-                  || (isAuthed() && resource != null && resource.data.viewer_uids is list
-                      && request.auth.uid in resource.data.viewer_uids)
-                  || (isAuthed() && resource != null && resource.data.member_uids is list
-                      && request.auth.uid in resource.data.member_uids);
-
-      // UPDATE — owner, orphan, admin, or moderator
-      allow update: if isOwner(resource)
-                    || isOrphan(resource)
-                    || (isAuthed() && resource != null && resource.data.admin_uids is list
-                        && request.auth.uid in resource.data.admin_uids)
-                    || (isAuthed() && resource != null && resource.data.moderator_uids is list
-                        && request.auth.uid in resource.data.moderator_uids);
-
-      // DELETE — owner or admin only
-      allow delete: if isOwner(resource)
-                    || isOrphan(resource)
-                    || (isAuthed() && resource != null && resource.data.admin_uids is list
-                        && request.auth.uid in resource.data.admin_uids);
-    }
-
-    // ── Tasks ─────────────────────────────────────────────────────────────────
-    match /apps/task-master-v1/tasks/{docId} {
-      // CREATE — any authed user; owner_id is stamped by the client
-      allow create: if isAuthed();
-
-      // READ — any authed user (tasks can be shared across projects)
-      allow read: if isAuthed();
-
-      // UPDATE — owner, orphan, or assignee
-      allow update: if isOwner(resource)
-                    || isOrphan(resource)
-                    || (isAuthed() && resource != null
-                        && resource.data.assignee_id == request.auth.uid);
-
-      // DELETE (hard purge) — owner or orphan only
-      allow delete: if isOwner(resource) || isOrphan(resource);
-    }
-
-    // ── Routines ──────────────────────────────────────────────────────────────
-    match /apps/task-master-v1/routines/{docId} {
-      allow create:        if isAuthed();
-      allow read:          if isAuthed();
-      allow update, delete: if isOwner(resource) || isOrphan(resource);
-    }
-
-    // ── Daily Logs ────────────────────────────────────────────────────────────
-    match /apps/task-master-v1/daily_logs/{docId} {
-      allow create:        if isAuthed();
-      allow read:          if isAuthed();
-      allow update, delete: if isOwner(resource) || isOrphan(resource);
-    }
-
-    // ── All other task-master-v1 collections (clients, notes, meetings…) ──────
+    // ── All task-master-v1 collections (projects, tasks, clients, notes, etc.) ──
     match /apps/task-master-v1/{collection}/{docId} {
       allow create:        if isAuthed();
-      allow read:          if isAuthed();
+      allow read:          if isAuthed(); // Simplified for query compatibility
       allow update, delete: if isOwner(resource) || isOrphan(resource);
+    }
+
+    // projects specific delete rule (admins can delete)
+    match /apps/task-master-v1/projects/{docId} {
+       allow delete: if isOwner(resource)
+                     || isOrphan(resource)
+                     || (isAuthed() && resource != null && resource.data.admin_uids is list
+                         && request.auth.uid in resource.data.admin_uids);
     }
 
     // ── Collection-level list queries ─────────────────────────────────────────
