@@ -354,8 +354,14 @@ export const Notes: React.FC = () => {
         });
     }, [notes, uid]);
 
-    const normalNotes = notes.filter((n) => !n.is_secure);
-    const vaultNotes = notes.filter((n) => n.is_secure);
+    const sortedNotes = [...notes].sort((a, b) => {
+        const aT = a.updated_at instanceof Date ? a.updated_at.getTime() : 0;
+        const bT = b.updated_at instanceof Date ? b.updated_at.getTime() : 0;
+        return bT - aT;
+    });
+
+    const normalNotes = sortedNotes.filter((n) => !n.is_secure);
+    const vaultNotes = sortedNotes.filter((n) => n.is_secure);
     const filteredNormal = normalNotes.filter((n) =>
         n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase())
     );
