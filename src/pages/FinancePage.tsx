@@ -1,18 +1,22 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { format } from 'date-fns';
+import { useAppStore } from '../store';
+import { format, addMonths, setDate as setDateFns } from 'date-fns';
 import {
     Plus, DollarSign, TrendingUp, TrendingDown, Wallet,
-    Loader2, Trash2, ChevronDown, ChevronUp, CalendarDays, ReceiptText
+    Loader2, Trash2, ChevronDown, ChevronUp, CalendarDays,
+    ArrowRightLeft, Landmark, CreditCard, PieChart
 } from 'lucide-react';
 import { createDoc, deleteDocById, listenCollection, where, orderBy } from '../firebase/firestore';
+import { formatCurrency, convertCurrency } from '../utils/currencyService';
 import toast from 'react-hot-toast';
-import type { FinanceEntry } from '../types';
+import type { FinanceEntry, CurrencyCode, FinanceType } from '../types';
 
-// ─── Finance Category options ─────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Entertainment', 'Bills', 'Other'];
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other'];
+const CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BDT'];
 
 // ─── Helper: toDate ───────────────────────────────────────────────────────────
 const toDate = (v: any): Date => {
@@ -22,10 +26,7 @@ const toDate = (v: any): Date => {
     return new Date(v);
 };
 
-// ─── Format currency ──────────────────────────────────────────────────────────
-const fmtMoney = (n: number) => `€${Math.abs(n).toFixed(2)}`;
-
-// ─── Entry Row ────────────────────────────────────────────────────────────────
+// ─── Entry Row Component ──────────────────────────────────────────────────────
 const EntryRow: React.FC<{ entry: FinanceEntry; onDelete: (id: string) => void }> = ({ entry, onDelete }) => (
     <motion.div
         layout
@@ -41,10 +42,10 @@ const EntryRow: React.FC<{ entry: FinanceEntry; onDelete: (id: string) => void }
         </div>
         <div className="flex-1 min-w-0">
             <p className="text-slate-200 text-sm font-semibold truncate">{entry.description}</p>
-            <p className="text-slate-500 text-xs">{entry.category}</p>
+            <p className="text-slate-500 text-[10px] uppercase font-bold">{entry.category}</p>
         </div>
         <p className={`font-black text-sm tabular-nums ${entry.type === 'earned' ? 'text-emerald-400' : 'text-red-400'}`}>
-            {entry.type === 'earned' ? '+' : '-'}{fmtMoney(entry.amount)}
+            {entry.type === 'earned' ? '+' : '-'}{formatCurrency(entry.amount, entry.currency || 'EUR')}
         </p>
         <button
             onClick={() => onDelete(entry.id)}
@@ -56,12 +57,22 @@ const EntryRow: React.FC<{ entry: FinanceEntry; onDelete: (id: string) => void }
     </motion.div>
 );
 
-// ─── Monthly Summary Card ─────────────────────────────────────────────────────
-const MonthCard: React.FC<{ month: string; entries: FinanceEntry[] }> = ({ month, entries }) => {
+// ─── Month Summary Card (History Tab) ──────────────────────────────────────────
+const MonthCard: React.FC<{ month: string; entries: FinanceEntry[]; displayCurrency: CurrencyCode; rates: Record<string, number> | null }> = ({ month, entries, displayCurrency, rates }) => {
     const [open, setOpen] = useState(false);
-    const spent = entries.filter(e => e.type === 'spent').reduce((s, e) => s + e.amount, 0);
-    const earned = entries.filter(e => e.type === 'earned').reduce((s, e) => s + e.amount, 0);
-    const net = earned - spent;
+
+    const totals = useMemo(() => {
+        let earned = 0;
+        let spent = 0;
+        
+        entries.forEach(e => {
+            const amtInDisplay = rates ? convertCurrency(e.amount, e.currency || 'EUR', displayCurrency, rates) : e.amount;
+            if (e.type === 'earned') earned += amtInDisplay;
+            else spent += amtInDisplay;
+        });
+
+        return { earned, spent, net: earned - spent };
+    }, [entries, displayCurrency, rates]);
 
     return (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden">
@@ -80,11 +91,11 @@ const MonthCard: React.FC<{ month: string; entries: FinanceEntry[] }> = ({ month
                 </div>
                 <div className="flex items-center gap-6">
                     <div className="text-right hidden sm:block">
-                        <p className="text-emerald-400 text-xs font-semibold">+{fmtMoney(earned)}</p>
-                        <p className="text-red-400 text-xs font-semibold">-{fmtMoney(spent)}</p>
+                        <p className="text-emerald-400 text-[10px] font-bold">+{formatCurrency(totals.earned, displayCurrency)}</p>
+                        <p className="text-red-400 text-[10px] font-bold">-{formatCurrency(totals.spent, displayCurrency)}</p>
                     </div>
-                    <p className={`font-black text-base tabular-nums ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {net >= 0 ? '+' : '-'}{fmtMoney(net)}
+                    <p className={`font-black text-sm tabular-nums ${totals.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {totals.net >= 0 ? '+' : '-'}{formatCurrency(totals.net, displayCurrency)}
                     </p>
                     {open ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
                 </div>
@@ -95,19 +106,18 @@ const MonthCard: React.FC<{ month: string; entries: FinanceEntry[] }> = ({ month
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
+                        className="overflow-hidden bg-slate-900/40"
                     >
-                        <div className="border-t border-slate-700/50 p-4 space-y-2">
+                        <div className="p-4 space-y-2">
                             {entries.map(e => (
                                 <div key={e.id} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2">
                                         <span className={`w-1.5 h-1.5 rounded-full ${e.type === 'earned' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                                         <span className="text-slate-300">{e.description}</span>
-                                        <span className="text-slate-600">· {e.category}</span>
+                                        <span className="text-slate-600 font-medium tracking-tight">({formatCurrency(e.amount, e.currency || 'EUR')})</span>
                                     </div>
                                     <span className={`font-bold tabular-nums ${e.type === 'earned' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {e.type === 'earned' ? '+' : '-'}{fmtMoney(e.amount)}
+                                        {rates ? formatCurrency(convertCurrency(e.amount, e.currency || 'EUR', displayCurrency, rates), displayCurrency) : formatCurrency(e.amount, e.currency || 'EUR')}
                                     </span>
                                 </div>
                             ))}
@@ -119,23 +129,40 @@ const MonthCard: React.FC<{ month: string; entries: FinanceEntry[] }> = ({ month
     );
 };
 
-// ─── Main Finance Page ────────────────────────────────────────────────────────
+// ─── Main Finance Page Component ─────────────────────────────────────────────
 export const FinancePage: React.FC = () => {
     const { user } = useAuth();
+    const { exchangeRates, savings, emis } = useAppStore();
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
-    const displayDate = format(today, 'EEEE, MMMM do');
 
-    const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
+    const [activeTab, setActiveTab] = useState<'today' | 'history' | 'savings' | 'emis'>('today');
+    const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('EUR');
+    
+    // Finance Entry State
     const [entries, setEntries] = useState<FinanceEntry[]>([]);
     const [loadingEntries, setLoadingEntries] = useState(true);
-
-    // Form state
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [type, setType] = useState<'spent' | 'earned'>('spent');
+    const [type, setType] = useState<FinanceType>('spent');
     const [category, setCategory] = useState('Food');
+    const [entryCurrency, setEntryCurrency] = useState<CurrencyCode>('EUR');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Savings Form State
+    const [savTitle, setSavTitle] = useState('');
+    const [savAmount, setSavAmount] = useState('');
+    const [savInstitution, setSavInstitution] = useState('');
+    const [savType] = useState<'savings' | 'investment'>('savings');
+    const [savCurrency, setSavCurrency] = useState<CurrencyCode>('EUR');
+
+    // EMI Form State
+    const [emiTitle, setEmiTitle] = useState('');
+    const [emiMonthly, setEmiMonthly] = useState('');
+    const [emiTotal, setEmiTotal] = useState('');
+    const [emiDueDay, setEmiDueDay] = useState('1');
+    const [emiMonths] = useState('12');
+    const [emiCurrency, setEmiCurrency] = useState<CurrencyCode>('EUR');
 
     // Real-time listener for finance entries
     useEffect(() => {
@@ -145,13 +172,9 @@ export const FinancePage: React.FC = () => {
             'finance_entries',
             (data) => {
                 setEntries(
-                    data
-                        .filter(d => !d.deleted_at)
-                        .map(d => ({
-                            ...d,
-                            created_at: toDate(d.created_at),
-                        }) as FinanceEntry)
-                        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+                    data.filter(d => !d.deleted_at)
+                    .map(d => ({ ...d, created_at: toDate(d.created_at) } as FinanceEntry))
+                    .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
                 );
                 setLoadingEntries(false);
             },
@@ -161,23 +184,20 @@ export const FinancePage: React.FC = () => {
         return unsub;
     }, [user]);
 
-    // Today's entries
-    const todayEntries = useMemo(() =>
-        entries.filter(e => e.date === todayStr),
-        [entries, todayStr]
-    );
+    // Data Filtering & Calculations
+    const todayEntries = useMemo(() => entries.filter(e => e.date === todayStr), [entries, todayStr]);
 
-    const todaySpent = useMemo(() =>
-        todayEntries.filter(e => e.type === 'spent').reduce((s, e) => s + e.amount, 0),
-        [todayEntries]
-    );
+    const todayStats = useMemo(() => {
+        let earned = 0;
+        let spent = 0;
+        todayEntries.forEach(e => {
+            const amtConverted = exchangeRates ? convertCurrency(e.amount, e.currency || 'EUR', displayCurrency, exchangeRates) : e.amount;
+            if (e.type === 'earned') earned += amtConverted;
+            else spent += amtConverted;
+        });
+        return { earned, spent, net: earned - spent };
+    }, [todayEntries, displayCurrency, exchangeRates]);
 
-    const todayEarned = useMemo(() =>
-        todayEntries.filter(e => e.type === 'earned').reduce((s, e) => s + e.amount, 0),
-        [todayEntries]
-    );
-
-    // Monthly groups for history
     const monthlyGroups = useMemo(() => {
         const groups: Record<string, FinanceEntry[]> = {};
         entries.forEach(e => {
@@ -185,236 +205,376 @@ export const FinancePage: React.FC = () => {
             if (!groups[key]) groups[key] = [];
             groups[key].push(e);
         });
-        return Object.entries(groups).sort(([a], [b]) => {
-            const da = new Date(a); const db = new Date(b);
-            return db.getTime() - da.getTime();
-        });
+        return Object.entries(groups).sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime());
     }, [entries]);
 
-    const handleAdd = async (e: React.FormEvent) => {
+    const savingsTotal = useMemo(() => {
+        return savings.reduce((acc, s) => acc + (exchangeRates ? convertCurrency(s.amount, s.currency || 'EUR', displayCurrency, exchangeRates) : s.amount), 0);
+    }, [savings, displayCurrency, exchangeRates]);
+
+    const emiMonthlyTotal = useMemo(() => {
+        return emis.reduce((acc, e) => acc + (exchangeRates ? convertCurrency(e.monthly_amount, e.currency || 'EUR', displayCurrency, exchangeRates) : e.monthly_amount), 0);
+    }, [emis, displayCurrency, exchangeRates]);
+
+    // Handlers
+    const handleAddEntry = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user || !description.trim() || !amount) return;
-        const amountVal = parseFloat(amount);
-        if (isNaN(amountVal) || amountVal <= 0) { toast.error('Enter a valid amount'); return; }
+        const amtVal = parseFloat(amount);
+        if (!user || !description.trim() || isNaN(amtVal)) return;
 
         setIsSaving(true);
         try {
             await createDoc('finance_entries', {
                 date: todayStr,
                 description: description.trim(),
-                amount: amountVal,
+                amount: amtVal,
+                currency: entryCurrency,
                 type,
                 category,
                 owner_id: user.uid,
             });
-            setDescription('');
-            setAmount('');
-            toast.success(`${type === 'spent' ? 'Expense' : 'Income'} added`);
-        } catch {
-            toast.error('Failed to add entry');
-        } finally {
-            setIsSaving(false);
-        }
+            setDescription(''); setAmount('');
+            toast.success('Entry added');
+        } catch { toast.error('Failed to add entry'); }
+        finally { setIsSaving(false); }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Delete this entry?')) return;
+    const handleAddSaving = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const amtVal = parseFloat(savAmount);
+        if (!user || !savTitle.trim() || isNaN(amtVal)) return;
+
+        setIsSaving(true);
         try {
-            await deleteDocById('finance_entries', id);
-            toast.success('Entry deleted');
-        } catch {
-            toast.error('Failed to delete');
-        }
+            await createDoc('savings', {
+                title: savTitle.trim(),
+                amount: amtVal,
+                currency: savCurrency,
+                institution: savInstitution.trim(),
+                type: savType,
+                date: todayStr,
+                owner_id: user.uid,
+            });
+            setSavTitle(''); setSavAmount(''); setSavInstitution('');
+            toast.success('Saving added');
+        } catch { toast.error('Failed to add saving'); }
+        finally { setIsSaving(false); }
     };
 
-    // Update available categories when type changes
-    const categoryOptions = type === 'spent' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+    const handleAddEMI = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const monthly = parseFloat(emiMonthly);
+        const total = parseFloat(emiTotal);
+        if (!user || !emiTitle.trim() || isNaN(monthly)) return;
+
+        setIsSaving(true);
+        try {
+            await createDoc('emis', {
+                title: emiTitle.trim(),
+                monthly_amount: monthly,
+                total_amount: total || 0,
+                currency: emiCurrency,
+                due_day: parseInt(emiDueDay),
+                remaining_months: parseInt(emiMonths),
+                start_date: todayStr,
+                owner_id: user.uid,
+            });
+            setEmiTitle(''); setEmiMonthly(''); setEmiTotal('');
+            toast.success('EMI added');
+        } catch { toast.error('Failed to add EMI'); }
+        finally { setIsSaving(false); }
+    };
 
     return (
-        <div className="max-w-3xl mx-auto space-y-6 pb-10 animate-fade-in">
-            {/* Header */}
-            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mt-2">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight flex items-center gap-3">
-                        Daily Finance
-                        <Wallet size={24} className="text-amber-400" />
-                    </h1>
-                    <p className="text-slate-400 text-sm mt-1">{displayDate}</p>
+        <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-fade-in px-4">
+            {/* Header with Currency Selector */}
+            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 py-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                        <Wallet size={24} className="text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-100 tracking-tight">Finance</h1>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mt-1">
+                            <Landmark size={12} className="text-indigo-400" /> Smart Management System
+                        </p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    {(['today', 'history'] as const).map(tab => (
+
+                <div className="flex items-center gap-2 p-1 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                    {CURRENCIES.map(c => (
                         <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
-                                activeTab === tab
-                                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                                    : 'bg-slate-800/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'
+                            key={c}
+                            onClick={() => setDisplayCurrency(c)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${
+                                displayCurrency === c
+                                    ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
+                                    : 'text-slate-500 hover:text-slate-300'
                             }`}
                         >
-                            {tab === 'today' ? 'Today' : 'Monthly History'}
+                            {c}
                         </button>
                     ))}
+                    <div className="w-px h-4 bg-slate-700 mx-1" />
+                    <button className="p-1.5 text-slate-400 hover:text-amber-400" title="Daily Exchange Rates">
+                        <ArrowRightLeft size={14} />
+                    </button>
                 </div>
             </header>
 
-            <AnimatePresence mode="wait">
-                {activeTab === 'today' ? (
-                    <motion.div
-                        key="today"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="space-y-5"
+            {/* Main Tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {(['today', 'history', 'savings', 'emis'] as const).map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`flex-shrink-0 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                            activeTab === tab
+                                ? 'bg-indigo-500/15 text-indigo-400 border-2 border-indigo-500/30 ring-4 ring-indigo-500/5'
+                                : 'bg-slate-800/40 text-slate-500 border-2 border-transparent hover:bg-slate-800 hover:text-slate-300'
+                        }`}
                     >
-                        {/* Stat Cards */}
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 relative overflow-hidden">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400"><TrendingUp size={15} /></div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Earned</span>
+                        {tab === 'emis' ? 'EMIs' : tab}
+                    </button>
+                ))}
+            </div>
+
+            <AnimatePresence mode="wait">
+                {activeTab === 'today' && (
+                    <motion.div key="today" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {[
+                                { label: 'Earned', val: todayStats.earned, icon: TrendingUp, color: 'emerald', bg: 'emerald-500/10' },
+                                { label: 'Spent', val: todayStats.spent, icon: TrendingDown, color: 'red', bg: 'red-500/10' },
+                                { label: 'Net Change', val: todayStats.net, icon: DollarSign, color: todayStats.net >= 0 ? 'emerald' : 'red', bg: 'indigo-500/10' }
+                            ].map(card => (
+                                <div key={card.label} className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 overflow-hidden relative">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className={`p-2 rounded-xl bg-${card.color}-500/15 text-${card.color}-400`}>
+                                            <card.icon size={16} />
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{card.label}</span>
+                                    </div>
+                                    <p className={`text-2xl font-black tabular-nums transition-colors duration-500 text-${card.color}-400`}>
+                                        {card.val >= 0 ? '+' : ''}{formatCurrency(card.val, displayCurrency)}
+                                    </p>
+                                    <div className={`absolute right-0 bottom-0 w-16 h-16 bg-${card.color}-500/5 blur-2xl rounded-full`} />
                                 </div>
-                                <p className="text-xl font-black text-emerald-400 tabular-nums">{fmtMoney(todayEarned)}</p>
-                                <div className="absolute right-0 top-0 w-20 h-20 bg-emerald-500/5 blur-[30px] rounded-full pointer-events-none" />
-                            </div>
-                            <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 relative overflow-hidden">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="p-2 rounded-lg bg-red-500/15 text-red-400"><TrendingDown size={15} /></div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Spent</span>
-                                </div>
-                                <p className="text-xl font-black text-red-400 tabular-nums">{fmtMoney(todaySpent)}</p>
-                                <div className="absolute right-0 top-0 w-20 h-20 bg-red-500/5 blur-[30px] rounded-full pointer-events-none" />
-                            </div>
-                            <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 relative overflow-hidden">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="p-2 rounded-lg bg-indigo-500/15 text-indigo-400"><DollarSign size={15} /></div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Net</span>
-                                </div>
-                                <p className={`text-xl font-black tabular-nums ${(todayEarned - todaySpent) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                    {(todayEarned - todaySpent) >= 0 ? '+' : '-'}{fmtMoney(todayEarned - todaySpent)}
-                                </p>
-                                <div className="absolute right-0 top-0 w-20 h-20 bg-indigo-500/5 blur-[30px] rounded-full pointer-events-none" />
-                            </div>
+                            ))}
                         </div>
 
-                        {/* Add Entry Form */}
-                        <form onSubmit={handleAdd} className="bg-slate-800/80 border border-amber-500/20 rounded-2xl p-5 space-y-4 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-[50px] rounded-full pointer-events-none" />
-                            <h3 className="text-amber-400 font-bold flex items-center gap-2 text-sm">
-                                <Plus size={16} /> Add Entry
-                            </h3>
-
-                            {/* Type toggle */}
-                            <div className="flex gap-2">
-                                {(['spent', 'earned'] as const).map(t => (
-                                    <button
-                                        key={t}
-                                        type="button"
-                                        onClick={() => { setType(t); setCategory(t === 'spent' ? 'Food' : 'Salary'); }}
-                                        className={`flex-1 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
-                                            type === t
-                                                ? t === 'spent'
-                                                    ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                                                    : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                                : 'bg-slate-900/60 text-slate-500 border border-slate-700 hover:border-slate-600'
-                                        }`}
-                                    >
-                                        {t === 'spent' ? '💸 Spent' : '💰 Earned'}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* Description */}
-                                <input
-                                    required
-                                    value={description}
-                                    onChange={e => setDescription(e.target.value)}
-                                    placeholder="Description (e.g. Coffee)"
-                                    className="bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all placeholder:text-slate-600"
-                                />
-
-                                {/* Amount */}
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">€</span>
-                                    <input
-                                        required
-                                        type="number"
-                                        min="0.01"
-                                        step="0.01"
-                                        value={amount}
-                                        onChange={e => setAmount(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full bg-slate-900 border border-slate-700 text-slate-200 rounded-xl pl-8 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all placeholder:text-slate-600 font-mono"
-                                    />
+                        {/* Add Form */}
+                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-3xl p-6 relative overflow-hidden ring-1 ring-white/5 shadow-2xl">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/50 to-orange-500/50" />
+                            <form onSubmit={handleAddEntry} className="space-y-5">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-amber-400 text-xs font-black uppercase tracking-widest">Add Daily Record</label>
+                                    <div className="flex bg-slate-900/50 p-1 rounded-xl">
+                                        {(['spent', 'earned'] as const).map(t => (
+                                            <button
+                                                key={t}
+                                                type="button"
+                                                onClick={() => setType(t)}
+                                                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                    type === t ? 'bg-slate-700 text-white' : 'text-slate-500'
+                                                }`}
+                                            >
+                                                {t}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                {/* Category */}
-                                <select
-                                    value={category}
-                                    onChange={e => setCategory(e.target.value)}
-                                    className="sm:col-span-2 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer"
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                                    <div className="sm:col-span-2">
+                                        <input
+                                            required
+                                            value={description}
+                                            onChange={e => setDescription(e.target.value)}
+                                            placeholder="What for?"
+                                            className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-3 text-sm focus:border-amber-500/40 focus:ring-4 focus:ring-amber-500/5 outline-none transition-all placeholder:text-slate-600 text-slate-100 font-medium"
+                                        />
+                                    </div>
+                                    <div className="relative group">
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1 items-center bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 group-focus-within:border-amber-500/30 transition-all">
+                                            <select 
+                                                value={entryCurrency} 
+                                                onChange={e => setEntryCurrency(e.target.value as CurrencyCode)}
+                                                className="bg-transparent border-none outline-none text-[10px] font-black text-amber-400 cursor-pointer appearance-none"
+                                            >
+                                                {CURRENCIES.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <input
+                                            required
+                                            type="number"
+                                            step="0.01"
+                                            value={amount}
+                                            onChange={e => setAmount(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl pl-4 pr-16 py-3 text-sm font-mono focus:border-amber-500/40 focus:ring-4 focus:ring-amber-500/5 outline-none transition-all text-slate-100"
+                                        />
+                                    </div>
+                                    <select
+                                        value={category}
+                                        onChange={e => setCategory(e.target.value)}
+                                        className="bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-400 outline-none focus:border-amber-500/40"
+                                    >
+                                        {(type === 'spent' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button
+                                    disabled={isSaving}
+                                    className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-slate-900 font-black rounded-2xl hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    {categoryOptions.map(c => (
-                                        <option key={c} value={c}>{c}</option>
-                                    ))}
-                                </select>
-                            </div>
+                                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+                                    CONFIRM TRANSACTION
+                                </button>
+                            </form>
+                        </div>
 
-                            <button
-                                type="submit"
-                                disabled={isSaving || !description || !amount}
-                                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 font-black rounded-xl transition-all flex items-center justify-center gap-2"
-                            >
-                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                {isSaving ? 'Saving...' : `Add ${type === 'spent' ? 'Expense' : 'Income'}`}
-                            </button>
-                        </form>
-
-                        {/* Today's Entry List */}
-                        <div>
-                            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <ReceiptText size={13} /> Today's Entries ({todayEntries.length})
-                            </h3>
+                        {/* List */}
+                        <div className="space-y-3">
+                            <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Recent Transactions</h3>
                             {loadingEntries ? (
-                                <div className="text-center py-8 text-slate-500 text-sm">Loading...</div>
+                                <div className="flex flex-col items-center py-12 gap-3 opacity-40">
+                                    <Loader2 className="animate-spin text-indigo-500" size={24} />
+                                    <span className="text-xs font-bold tracking-widest">FETCHING DATA...</span>
+                                </div>
                             ) : todayEntries.length === 0 ? (
-                                <div className="text-center py-10 border-2 border-dashed border-slate-800 rounded-2xl text-slate-600 text-sm">
-                                    No entries yet. Add your first transaction above.
+                                <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-600 italic text-sm">
+                                    No entries recorded for today.
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    <AnimatePresence>
-                                        {todayEntries.map(entry => (
-                                            <EntryRow key={entry.id} entry={entry} onDelete={handleDelete} />
-                                        ))}
+                                    <AnimatePresence mode="popLayout">
+                                        {todayEntries.map(e => <EntryRow key={e.id} entry={e} onDelete={(id) => deleteDocById('finance_entries', id)} />)}
                                     </AnimatePresence>
                                 </div>
                             )}
                         </div>
                     </motion.div>
-                ) : (
-                    <motion.div
-                        key="history"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="space-y-4"
-                    >
-                        <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                            <CalendarDays size={13} /> Monthly Records
-                        </h3>
-                        {loadingEntries ? (
-                            <div className="text-center py-10 text-slate-500 text-sm">Loading history...</div>
-                        ) : monthlyGroups.length === 0 ? (
-                            <div className="text-center py-16 border-2 border-dashed border-slate-800 rounded-2xl text-slate-600 text-sm">
-                                No financial records yet.
+                )}
+
+                {activeTab === 'savings' && (
+                    <motion.div key="savings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                        <div className="bg-gradient-to-br from-emerald-500/20 to-teal-500/5 border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden">
+                            <div className="flex justify-between items-center mb-4">
+                                <Landmark className="text-emerald-400" size={32} />
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60">Total Savings & Assets</p>
+                                    <p className="text-3xl font-black text-emerald-400 tabular-nums">{formatCurrency(savingsTotal, displayCurrency)}</p>
+                                </div>
                             </div>
+                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/10 blur-[80px] rounded-full" />
+                        </div>
+
+                        <form onSubmit={handleAddSaving} className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-slate-800/40 p-4 rounded-3xl border border-slate-700/50">
+                            <input required value={savTitle} onChange={e => setSavTitle(e.target.value)} placeholder="Asset Name" className="sm:col-span-2 bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/50" />
+                            <input required type="number" step="0.01" value={savAmount} onChange={e => setSavAmount(e.target.value)} placeholder="Value" className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2 text-sm font-mono text-slate-200 outline-none focus:border-emerald-500/50" />
+                            <select value={savCurrency} onChange={e => setSavCurrency(e.target.value as CurrencyCode)} className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
+                                {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <button className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20">ADD ASSET</button>
+                        </form>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {savings.map(s => (
+                                <div key={s.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 flex justify-between items-center group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 rounded-xl bg-slate-700/50 text-indigo-400">
+                                            {s.type === 'savings' ? <Landmark size={16} /> : <PieChart size={16} />}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-100">{s.title}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{s.institution || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <p className="text-emerald-400 font-bold tabular-nums text-sm">{formatCurrency(s.amount, s.currency || 'EUR')}</p>
+                                        <button onClick={() => deleteDocById('savings', s.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400 p-1"><Trash2 size={13} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+
+                {activeTab === 'emis' && (
+                    <motion.div key="emis" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                        <div className="bg-gradient-to-br from-red-500/20 to-orange-500/5 border border-red-500/20 rounded-3xl p-6 relative overflow-hidden">
+                            <div className="flex justify-between items-center mb-4">
+                                <CreditCard className="text-red-400" size={32} />
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-red-500/60">Monthly EMI Load</p>
+                                    <p className="text-3xl font-black text-red-400 tabular-nums">{formatCurrency(emiMonthlyTotal, displayCurrency)}</p>
+                                </div>
+                            </div>
+                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-red-500/10 blur-[80px] rounded-full" />
+                        </div>
+
+                        <form onSubmit={handleAddEMI} className="space-y-3 bg-slate-800/40 p-5 rounded-3xl border border-slate-700/50">
+                            <p className="text-red-400 text-[10px] font-black uppercase tracking-tighter mb-2">New EMI / Loan Installment</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <input required value={emiTitle} onChange={e => setEmiTitle(e.target.value)} placeholder="EMI Title" className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-red-500/50" />
+                                <input required type="number" step="0.01" value={emiMonthly} onChange={e => setEmiMonthly(e.target.value)} placeholder="Monthly Amount" className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 outline-none focus:border-red-500/50" />
+                                <div className="flex gap-2">
+                                    <select value={emiCurrency} onChange={e => setEmiCurrency(e.target.value as CurrencyCode)} className="flex-1 bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
+                                        {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    <input value={emiDueDay} type="number" min="1" max="31" onChange={e => setEmiDueDay(e.target.value)} placeholder="Day" className="w-20 bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-center font-mono outline-none" title="Due Day of Month" />
+                                </div>
+                            </div>
+                            <button className="w-full bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-2xl text-xs transition-all shadow-lg shadow-red-500/20 uppercase tracking-widest">Register Installment</button>
+                        </form>
+
+                        <div className="space-y-3">
+                            {emis.map(e => (
+                                <div key={e.id} className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-5 flex flex-wrap sm:flex-nowrap justify-between items-center gap-4 group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-slate-700/50 flex flex-col items-center justify-center border border-slate-600/30">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Day</span>
+                                            <span className="text-lg font-black text-slate-200 leading-none">{e.due_day}</span>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-100">{e.title}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-900 text-[10px] font-bold text-slate-500 border border-slate-700 uppercase">{e.remaining_months} months left</span>
+                                                <span className="text-slate-600 text-[10px] font-medium italic">Monthly auto-deduct simulation enabled</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
+                                        <div className="text-right">
+                                            <p className="text-red-400 font-black tabular-nums">{formatCurrency(e.monthly_amount, e.currency || 'EUR')}</p>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">Next: {format(setDateFns(addMonths(new Date(), 1), e.due_day), 'dd MMM')}</p>
+                                        </div>
+                                        <button onClick={() => deleteDocById('emis', e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400 p-2 bg-slate-900 rounded-xl"><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+
+                {activeTab === 'history' && (
+                    <motion.div key="history" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+                        <header className="flex justify-between items-center mb-2 px-1">
+                            <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                                <CalendarDays size={14} className="text-indigo-400" /> Historical Logs
+                            </h3>
+                            <button className="text-[10px] font-black uppercase text-indigo-400 hover:underline">Export CSV</button>
+                        </header>
+                        {loadingEntries ? (
+                            <div className="flex justify-center py-20 opacity-30"><Loader2 className="animate-spin" /></div>
+                        ) : monthlyGroups.length === 0 ? (
+                            <div className="py-20 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 italic">Financial data history is empty.</div>
                         ) : (
                             monthlyGroups.map(([month, monthEntries]) => (
-                                <MonthCard key={month} month={month} entries={monthEntries} />
+                                <MonthCard key={month} month={month} entries={monthEntries} displayCurrency={displayCurrency} rates={exchangeRates} />
                             ))
                         )}
                     </motion.div>

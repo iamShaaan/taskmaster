@@ -34,6 +34,16 @@ interface AppStore {
     dailyLogs: DailyLog[];
     setDailyLogs: (logs: DailyLog[]) => void;
 
+    // Finance (Global state for calculations)
+    savings: import('../types').SavingEntry[];
+    setSavings: (savings: import('../types').SavingEntry[]) => void;
+    
+    emis: import('../types').EMIEntry[];
+    setEmis: (emis: import('../types').EMIEntry[]) => void;
+
+    exchangeRates: Record<string, number> | null;
+    setExchangeRates: (rates: Record<string, number> | null) => void;
+
     // UI state
     sidebarOpen: boolean;
     setSidebarOpen: (open: boolean) => void;
@@ -71,6 +81,15 @@ export const useAppStore = create<AppStore>((set) => ({
 
     dailyLogs: [],
     setDailyLogs: (dailyLogs) => set({ dailyLogs }),
+
+    savings: [],
+    setSavings: (savings) => set({ savings }),
+
+    emis: [],
+    setEmis: (emis) => set({ emis }),
+
+    exchangeRates: null,
+    setExchangeRates: (exchangeRates) => set({ exchangeRates }),
 
     sidebarOpen: true,
     setSidebarOpen: (open) => set({ sidebarOpen: open }),

@@ -200,14 +200,41 @@ export interface DailyLog {
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
 export type FinanceType = 'spent' | 'earned';
+export type CurrencyCode = 'EUR' | 'USD' | 'BDT';
 
 export interface FinanceEntry {
     id: string;
     date: string;           // "YYYY-MM-DD"
     description: string;
     amount: number;
+    currency: CurrencyCode;
     type: FinanceType;
     category: string;       // e.g. "food", "transport", "salary"
+    owner_id: string;
+    created_at: Date;
+}
+
+export interface SavingEntry {
+    id: string;
+    title: string;
+    amount: number;
+    currency: CurrencyCode;
+    institution: string;    // e.g. "Bank", "Stock Market"
+    type: 'savings' | 'investment';
+    date: string;           // "YYYY-MM-DD"
+    owner_id: string;
+    created_at: Date;
+}
+
+export interface EMIEntry {
+    id: string;
+    title: string;
+    total_amount: number;
+    monthly_amount: number;
+    currency: CurrencyCode;
+    due_day: number;        // 1-31
+    remaining_months: number;
+    start_date: string;
     owner_id: string;
     created_at: Date;
 }

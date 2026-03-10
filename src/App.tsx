@@ -13,7 +13,8 @@ import { Auth } from './pages/Auth';
 import { useAuth } from './hooks/useAuth';
 import { listenCollection, orderBy, toDate, where } from './firebase/firestore';
 import { useAppStore } from './store';
-import type { Task, Meeting, Client, Project, Note, Routine, DailyLog } from './types';
+import { fetchExchangeRates } from './utils/currencyService';
+import type { Task, Meeting, Client, Project, Note, Routine, DailyLog, SavingEntry, EMIEntry } from './types';
 import { Sparkles } from 'lucide-react';
 
 import { ClientDetail } from './pages/ClientDetail';
@@ -30,7 +31,14 @@ const DataLoader: React.FC = () => {
   const { user } = useAuth();
   const store = useAppStore();
 
-  // 1. Auto-heal meetings with mismatched project members
+  // 1. Fetch Exchange Rates
+  useEffect(() => {
+    fetchExchangeRates().then(data => {
+      if (data) store.setExchangeRates(data.rates);
+    });
+  }, []);
+
+  // 2. Auto-heal meetings...
   useEffect(() => {
     if (!user || store.meetings.length === 0 || store.projects.length === 0) return;
 
@@ -155,6 +163,22 @@ const DataLoader: React.FC = () => {
       } as unknown as DailyLog)));
     }, where('owner_id', '==', user.uid));
 
+    // --- Savings ---
+    sub('savings', (data) => {
+      store.setSavings(data.filter(d => !d.deleted_at).map(d => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date()
+      } as unknown as SavingEntry)));
+    }, where('owner_id', '==', user.uid));
+
+    // --- EMIs ---
+    sub('emis', (data) => {
+      store.setEmis(data.filter(d => !d.deleted_at).map(d => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date()
+      } as unknown as EMIEntry)));
+    }, where('owner_id', '==', user.uid));
+
     return () => unsubs.forEach((u) => u());
   }, [user?.uid]);
 
@@ -200,6 +224,7 @@ function App() {
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:id" element={<ProjectDetail />} />
               <Route path="routine" element={<RoutinePage />} />
+              <Route path="finance" element={<FinancePage />} />
 
               <Route path="user-data" element={<UserDataLayout />}>
                 <Route index element={<Clients />} />
@@ -208,7 +233,6 @@ function App() {
                 <Route path="archive" element={<ArchivePage />} />
                 <Route path="time-tracker" element={<TimeTracker />} />
                 <Route path="vault" element={<Vault />} />
-                <Route path="finance" element={<FinancePage />} />
               </Route>
 
               <Route path="*" element={<Dashboard />} />
