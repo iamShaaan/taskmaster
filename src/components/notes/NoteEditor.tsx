@@ -9,19 +9,20 @@ interface NoteEditorProps {
     onClose: () => void;
     editNote?: Note;
     linked_project_id?: string;
+    defaultSecure?: boolean;
 }
 
 const inputCls = 'w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-500';
 const labelCls = 'block text-slate-400 text-xs font-medium mb-1';
 
-export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote, linked_project_id }) => {
+export const NoteEditor: React.FC<NoteEditorProps> = ({ onClose, editNote, linked_project_id, defaultSecure }) => {
     const [loading, setLoading] = useState(false);
     const [tagInput, setTagInput] = useState('');
     const [form, setForm] = useState({
         title: editNote?.title || '',
         content: editNote?.content || '',
         tags: editNote?.tags || [] as string[],
-        is_secure: editNote?.is_secure || false,
+        is_secure: editNote?.is_secure ?? defaultSecure ?? false,
         is_credential: editNote?.is_credential || false,
         linked_project_id: editNote?.linked_project_id || linked_project_id || null,
     });

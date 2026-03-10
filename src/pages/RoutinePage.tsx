@@ -4,8 +4,8 @@ import { useAppStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { format } from 'date-fns';
 import { 
-    Plus, Activity, BrainCircuit, DollarSign, Briefcase, 
-    CheckCircle2, Circle, Clock, TrendingUp, Sparkles, Loader2, Gamepad2, Edit2, Trash2 
+    Plus, Activity, BrainCircuit, Briefcase, 
+    CheckCircle2, Circle, Clock, TrendingUp, Sparkles, Gamepad2, Edit2, Trash2 
 } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { RoutineForm } from '../components/routine/RoutineForm';
@@ -16,7 +16,6 @@ import type { RoutineCategory, Routine } from '../types';
 const CATEGORY_ICONS: Record<RoutineCategory, React.ElementType> = {
     body: Activity,
     mind: BrainCircuit,
-    finance: DollarSign,
     office: Briefcase,
     fun: Gamepad2,
 };
@@ -24,7 +23,6 @@ const CATEGORY_ICONS: Record<RoutineCategory, React.ElementType> = {
 const CATEGORY_COLORS: Record<RoutineCategory, { bg: string; text: string; border: string; label: string }> = {
     body: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: 'Body' },
     mind: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', label: 'Mind' },
-    finance: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', label: 'Finance' },
     office: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', label: 'Office' },
     fun: { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', label: 'Fun' },
 };
@@ -40,18 +38,11 @@ export const RoutinePage: React.FC = () => {
 
     // Date calculations
     const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd'); // e.g. "2026-03-08"
+    const todayStr = format(today, 'yyyy-MM-dd');
     const displayDate = format(today, 'EEEE, MMMM do');
 
     // Filter logs for today
     const logsToday = useMemo(() => dailyLogs.filter(l => l.date === todayStr), [dailyLogs, todayStr]);
-
-    // Financial log (the one without a routine_id)
-    const financeLog = useMemo(() => logsToday.find(l => !l.routine_id) || null, [logsToday]);
-
-    const [spentInput, setSpentInput] = useState(financeLog?.spent?.toString() || '');
-    const [earnedInput, setEarnedInput] = useState(financeLog?.earned?.toString() || '');
-    const [isSavingFinance, setIsSavingFinance] = useState(false);
 
     // Filter and sort active routines
     const activeRoutines = useMemo(() => {
@@ -87,10 +78,8 @@ export const RoutinePage: React.FC = () => {
 
         try {
             if (existingLog) {
-                // Update
                 await updateDocById('daily_logs', existingLog.id, { completed: newStatus });
             } else {
-                // Create
                 await createDoc('daily_logs', {
                     date: todayStr,
                     routine_id: routineId,
@@ -122,35 +111,6 @@ export const RoutinePage: React.FC = () => {
         setIsFormOpen(true);
     };
 
-    const handleSaveFinance = async () => {
-        if (!user) return;
-        setIsSavingFinance(true);
-        const spentVal = parseFloat(spentInput) || 0;
-        const earnedVal = parseFloat(earnedInput) || 0;
-
-        try {
-            if (financeLog) {
-                await updateDocById('daily_logs', financeLog.id, {
-                    spent: spentVal,
-                    earned: earnedVal,
-                });
-            } else {
-                await createDoc('daily_logs', {
-                    date: todayStr,
-                    spent: spentVal,
-                    earned: earnedVal,
-                    owner_id: user.uid,
-                });
-            }
-            toast.success('Finances updated!');
-        } catch (error) {
-            console.error('Failed to save finance:', error);
-            toast.error('Failed to update finances');
-        } finally {
-            setIsSavingFinance(false);
-        }
-    };
-
     const handleDragStart = (e: React.DragEvent, taskId: string, taskTitle: string) => {
         e.dataTransfer.setData('taskId', taskId);
         e.dataTransfer.setData('taskTitle', taskTitle);
@@ -161,7 +121,6 @@ export const RoutinePage: React.FC = () => {
         const taskId = e.dataTransfer.getData('taskId');
         const taskTitle = e.dataTransfer.getData('taskTitle');
         if (taskId && taskTitle) {
-            // Open the routine form with the task details pre-filled
             setRoutineToEdit({
                 title: taskTitle,
                 linked_task_id: taskId,
@@ -210,8 +169,8 @@ export const RoutinePage: React.FC = () => {
             </header>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden sm:col-span-2">
                     <div className="relative z-10 flex items-center justify-between mb-4">
                         <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400"><TrendingUp size={18} /></div>
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Today's Progress</span>
@@ -231,32 +190,6 @@ export const RoutinePage: React.FC = () => {
                         </div>
                     </div>
                     <div className="absolute right-[-20%] top-[-20%] w-32 h-32 bg-indigo-500/10 blur-[40px] rounded-full pointer-events-none" />
-                </div>
-
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
-                    <div className="relative z-10 flex items-center justify-between mb-2">
-                        <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400"><DollarSign size={18} /></div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Earned Today</span>
-                    </div>
-                    <div className="relative z-10 flex-1 flex flex-col justify-end">
-                        <p className="text-2xl font-black text-amber-400 tracking-tight">
-                            ${financeLog?.earned?.toFixed(2) || '0.00'}
-                        </p>
-                    </div>
-                    <div className="absolute right-[-20%] top-[-20%] w-32 h-32 bg-amber-500/10 blur-[40px] rounded-full pointer-events-none" />
-                </div>
-
-                <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
-                    <div className="relative z-10 flex items-center justify-between mb-2">
-                        <div className="p-2.5 rounded-xl bg-red-500/20 text-red-400"><DollarSign size={18} /></div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Spent Today</span>
-                    </div>
-                    <div className="relative z-10 flex-1 flex flex-col justify-end">
-                        <p className="text-2xl font-black text-red-400 tracking-tight">
-                            ${financeLog?.spent?.toFixed(2) || '0.00'}
-                        </p>
-                    </div>
-                    <div className="absolute right-[-20%] top-[-20%] w-32 h-32 bg-red-500/10 blur-[40px] rounded-full pointer-events-none" />
                 </div>
             </div>
 
@@ -355,7 +288,7 @@ export const RoutinePage: React.FC = () => {
                                                     {routine.start_time || (routine as any).time || 'No time'} {routine.end_time ? `- ${routine.end_time}` : ''}
                                                 </div>
                                                 <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${catColor.bg} ${catColor.text}`}>
-                                                    <CatIcon size={10} />
+                                                    {CatIcon && <CatIcon size={10} />}
                                                     {catColor.label}
                                                 </div>
                                                 {routine.linked_task_id && (
@@ -390,60 +323,10 @@ export const RoutinePage: React.FC = () => {
                     </AnimatePresence>
                 </div>
 
-                {/* Specific Sections (Visible when a tab is active, or we can show Finance specifically) */}
+                {/* Specific Sections (Visible when a tab is active) */}
                 {activeTab !== 'all' && (
                     <div className="col-span-1 border-l border-slate-700/50 pl-0 lg:pl-6 space-y-6">
                         
-                        {(activeTab === 'finance') && (
-                            <motion.div 
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                className="bg-slate-800/80 border border-amber-500/20 rounded-2xl p-5 relative overflow-hidden"
-                            >
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-[40px] pointer-events-none" />
-                                <h3 className="text-amber-400 font-bold mb-4 flex items-center gap-2">
-                                    <DollarSign size={18} />
-                                    Daily Finance Ledger
-                                </h3>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                                            Earned Today ($)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={earnedInput}
-                                            onChange={e => setEarnedInput(e.target.value)}
-                                            placeholder="0.00"
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-mono"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                                            Spent Today ($)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={spentInput}
-                                            onChange={e => setSpentInput(e.target.value)}
-                                            placeholder="0.00"
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all font-mono"
-                                        />
-                                    </div>
-
-                                    <button
-                                        onClick={handleSaveFinance}
-                                        disabled={isSavingFinance}
-                                        className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold rounded-xl transition-all flex items-center justify-center gap-2"
-                                    >
-                                        {isSavingFinance ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                        Save Finances
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-
                         {activeTab === 'body' && (
                             <div className="bg-slate-800/50 border border-emerald-500/20 rounded-2xl p-5 text-center">
                                 <div className="p-3 bg-emerald-500/10 rounded-full inline-flex mb-3">

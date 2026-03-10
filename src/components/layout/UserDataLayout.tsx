@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Users, FileText, HardDrive, Archive, Clock } from 'lucide-react';
+import { Users, Shield, Clock, DollarSign, Archive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { db, APP_ID } from '../../firebase/config';
@@ -17,8 +17,8 @@ const navItems = [
     { to: '/user-data', icon: Users, label: 'Clients', end: true },
     { to: '/user-data/team', icon: Users, label: 'Team Members' },
     { to: '/user-data/time-tracker', icon: Clock, label: 'Time Tracker' },
-    { to: '/user-data/notes', icon: FileText, label: 'Notes & Vault' },
-    { to: '/user-data/files', icon: HardDrive, label: 'Files' },
+    { to: '/user-data/finance', icon: DollarSign, label: 'Finance' },
+    { to: '/user-data/vault', icon: Shield, label: 'Vault' },
     { to: '/user-data/archive', icon: Archive, label: 'Archive' },
 ];
 

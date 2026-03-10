@@ -7,8 +7,8 @@ import { Tasks } from './pages/Tasks';
 import { Meetings } from './pages/Meetings';
 import { Clients } from './pages/Clients';
 import { Projects } from './pages/Projects';
-import { Notes } from './pages/Notes';
-import { Files } from './pages/Files';
+import { Vault } from './pages/Vault';
+import { FinancePage } from './pages/FinancePage';
 import { Auth } from './pages/Auth';
 import { useAuth } from './hooks/useAuth';
 import { listenCollection, orderBy, toDate, where } from './firebase/firestore';
@@ -207,8 +207,8 @@ function App() {
                 <Route path="team" element={<TeamMembers />} />
                 <Route path="archive" element={<ArchivePage />} />
                 <Route path="time-tracker" element={<TimeTracker />} />
-                <Route path="notes" element={<Notes />} />
-                <Route path="files" element={<Files />} />
+                <Route path="vault" element={<Vault />} />
+                <Route path="finance" element={<FinancePage />} />
               </Route>
 
               <Route path="*" element={<Dashboard />} />

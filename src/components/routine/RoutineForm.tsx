@@ -15,7 +15,6 @@ const CATEGORIES: { value: RoutineCategory; label: string; color: string }[] = [
     { value: 'body', label: 'Body', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
     { value: 'mind', label: 'Mind', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
     { value: 'office', label: 'Productivity/Office', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
-    { value: 'finance', label: 'Finance', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
     { value: 'fun', label: 'Fun & Gaming', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
 ];
 

@@ -173,7 +173,7 @@ export interface FileAttachment {
     is_archived?: boolean;
 }
 
-export type RoutineCategory = 'body' | 'mind' | 'finance' | 'office' | 'fun';
+export type RoutineCategory = 'body' | 'mind' | 'office' | 'fun';
 
 export interface Routine {
     id: string;
@@ -196,6 +196,32 @@ export interface DailyLog {
     earned?: number;
     owner_id: string;
     created_at?: Date;
+}
+
+// ─── Finance ─────────────────────────────────────────────────────────────────
+export type FinanceType = 'spent' | 'earned';
+
+export interface FinanceEntry {
+    id: string;
+    date: string;           // "YYYY-MM-DD"
+    description: string;
+    amount: number;
+    type: FinanceType;
+    category: string;       // e.g. "food", "transport", "salary"
+    owner_id: string;
+    created_at: Date;
+}
+
+// ─── Vault File ───────────────────────────────────────────────────────────────
+export interface VaultFile {
+    id: string;
+    name: string;
+    url: string;
+    type: string;           // MIME type
+    size: number;
+    storage_path: string;   // Firebase Storage path
+    owner_id: string;
+    created_at: Date;
 }
 
 export interface N8nAction {
