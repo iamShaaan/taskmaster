@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { format } from 'date-fns';
-import type { Invoice, UserProfile, CurrencyCode } from '../types';
+import type { Invoice, UserProfile } from '../types';
 import { formatCurrency } from './currencyService';
 
 // Extend jsPDF with autotable types
