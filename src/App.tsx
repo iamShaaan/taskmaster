@@ -14,7 +14,7 @@ import { useAuth } from './hooks/useAuth';
 import { listenCollection, orderBy, toDate, where } from './firebase/firestore';
 import { useAppStore } from './store';
 import { fetchExchangeRates } from './utils/currencyService';
-import type { Task, Meeting, Client, Project, Note, Routine, DailyLog, SavingEntry, EMIEntry } from './types';
+import type { Task, Meeting, Client, Project, Note, Routine, DailyLog, SavingEntry, EMIEntry, Invoice } from './types';
 import { Sparkles } from 'lucide-react';
 
 import { ClientDetail } from './pages/ClientDetail';
@@ -178,6 +178,14 @@ const DataLoader: React.FC = () => {
         created_at: toDate(d.created_at as never) || new Date()
       } as unknown as EMIEntry)));
     }, where('owner_id', '==', user.uid));
+
+    // --- Invoices ---
+    sub('invoices', (data) => {
+      store.setInvoices(data.filter(d => !d.deleted_at).map(d => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date()
+      } as unknown as Invoice)));
+    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
 
     return () => unsubs.forEach((u) => u());
   }, [user?.uid]);

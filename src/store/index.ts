@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Task, Meeting, Client, Project, Note, FileAttachment, Routine, DailyLog } from '../types';
+import type { Task, Meeting, Client, Project, Note, FileAttachment, Routine, DailyLog, Invoice } from '../types';
 
 interface AppStore {
     // Tasks
@@ -43,6 +43,9 @@ interface AppStore {
 
     exchangeRates: Record<string, number> | null;
     setExchangeRates: (rates: Record<string, number> | null) => void;
+
+    invoices: Invoice[];
+    setInvoices: (invoices: Invoice[]) => void;
 
     // UI state
     sidebarOpen: boolean;
@@ -90,6 +93,9 @@ export const useAppStore = create<AppStore>((set) => ({
 
     exchangeRates: null,
     setExchangeRates: (exchangeRates) => set({ exchangeRates }),
+
+    invoices: [],
+    setInvoices: (invoices) => set({ invoices }),
 
     sidebarOpen: true,
     setSidebarOpen: (open) => set({ sidebarOpen: open }),

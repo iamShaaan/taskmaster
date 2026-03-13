@@ -1,6 +1,6 @@
 import type { CurrencyCode } from '../types';
 
-const BASE_CURRENCY: CurrencyCode = 'EUR';
+const BASE_CURRENCY: CurrencyCode = 'BDT';
 const API_URL = `https://api.exchangerate-api.com/v4/latest/${BASE_CURRENCY}`;
 const CACHE_KEY = 'taskmaster_exchange_rates';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours

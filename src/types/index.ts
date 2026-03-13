@@ -200,7 +200,31 @@ export interface DailyLog {
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
 export type FinanceType = 'spent' | 'earned';
-export type CurrencyCode = 'EUR' | 'USD' | 'BDT';
+export type CurrencyCode = 'BDT' | 'USD' | 'EUR';
+
+export interface InvoiceItem {
+    description: string;
+    quantity: number;
+    price: number;
+}
+
+export interface Invoice {
+    id: string;
+    invoice_number: string;
+    date: string;           // "YYYY-MM-DD"
+    due_date?: string;      // "YYYY-MM-DD"
+    type: 'client_bill' | 'team_payout';
+    sender_id: string;      // Profile owner
+    recipient_id: string;   // Client ID or Team Member Email/UID
+    recipient_name: string;
+    items: InvoiceItem[];
+    currency: CurrencyCode;
+    status: 'draft' | 'sent' | 'paid' | 'overdue';
+    linked_task_id?: string;
+    owner_id: string;
+    created_at: Date;
+    total_amount: number;
+}
 
 export interface FinanceEntry {
     id: string;

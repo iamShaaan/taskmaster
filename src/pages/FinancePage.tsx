@@ -8,15 +8,17 @@ import {
     Loader2, Trash2, ChevronDown, ChevronUp, CalendarDays,
     ArrowRightLeft, Landmark, CreditCard, PieChart
 } from 'lucide-react';
-import { createDoc, deleteDocById, listenCollection, where, orderBy } from '../firebase/firestore';
+import { createDoc, deleteDocById, listenCollection, where, orderBy, getDocById } from '../firebase/firestore';
 import { formatCurrency, convertCurrency } from '../utils/currencyService';
+import { generateInvoicePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
-import type { FinanceEntry, CurrencyCode, FinanceType } from '../types';
+import type { FinanceEntry, CurrencyCode, FinanceType, Invoice, InvoiceItem, UserProfile } from '../types';
+import { FileText, Download, User, Briefcase } from 'lucide-react';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Entertainment', 'Bills', 'Other'];
 const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other'];
-const CURRENCIES: CurrencyCode[] = ['EUR', 'USD', 'BDT'];
+const CURRENCIES: CurrencyCode[] = ['BDT', 'USD', 'EUR'];
 
 // ─── Helper: toDate ───────────────────────────────────────────────────────────
 const toDate = (v: any): Date => {
@@ -129,15 +131,304 @@ const MonthCard: React.FC<{ month: string; entries: FinanceEntry[]; displayCurre
     );
 };
 
-// ─── Main Finance Page Component ─────────────────────────────────────────────
+const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) => {
+    const { invoices, clients, tasks } = useAppStore();
+    const [isCreating, setIsCreating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Form State
+    const [type, setType] = useState<'client_bill' | 'team_payout'>('client_bill');
+    const [recipientId, setRecipientId] = useState('');
+    const [recipientName, setRecipientName] = useState('');
+    const [currency, setCurrency] = useState<CurrencyCode>('BDT');
+    const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, price: 0 }]);
+    const [dueDate, setDueDate] = useState('');
+    const [linkedTaskId, setLinkedTaskId] = useState('');
+
+    const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+    const handleAddItem = () => setItems([...items, { description: '', quantity: 1, price: 0 }]);
+    const handleRemoveItem = (index: number) => setItems(items.filter((_, i) => i !== index));
+    const handleItemChange = (index: number, field: keyof InvoiceItem, value: any) => {
+        const newItems = [...items];
+        newItems[index] = { ...newItems[index], [field]: value };
+        setItems(newItems);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!recipientName.trim() || items.some(i => !i.description.trim())) {
+            toast.error('Please fill required fields');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const invoiceNum = `INV-${Date.now().toString().slice(-6)}`;
+            const newInvoice: Partial<Invoice> = {
+                invoice_number: invoiceNum,
+                date: format(new Date(), 'yyyy-MM-dd'),
+                due_date: dueDate || undefined,
+                type,
+                sender_id: profile.uid || '',
+                recipient_id: recipientId,
+                recipient_name: recipientName,
+                items,
+                currency,
+                status: 'sent',
+                linked_task_id: linkedTaskId || undefined,
+                owner_id: profile.uid || '',
+                total_amount: subtotal,
+                created_at: new Date()
+            };
+
+            await createDoc('invoices', newInvoice);
+            toast.success('Invoice created');
+            setIsCreating(false);
+            setItems([{ description: '', quantity: 1, price: 0 }]);
+            setRecipientId('');
+            setRecipientName('');
+        } catch (err) {
+            toast.error('Failed to create invoice');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Billing & Invoices</h3>
+                <button
+                    onClick={() => setIsCreating(!isCreating)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20"
+                >
+                    {isCreating ? 'CANCEL' : <><Plus size={14} /> NEW INVOICE</>}
+                </button>
+            </div>
+
+            <AnimatePresence>
+                {isCreating && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-slate-700/50 rounded-3xl p-6 space-y-5 relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Invoice Type</label>
+                                    <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-700/50">
+                                        <button
+                                            type="button"
+                                            onClick={() => setType('client_bill')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${type === 'client_bill' ? 'bg-indigo-500 text-white' : 'text-slate-500'}`}
+                                        >
+                                            <Briefcase size={12} /> Client Bill
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setType('team_payout')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${type === 'team_payout' ? 'bg-indigo-500 text-white' : 'text-slate-500'}`}
+                                        >
+                                            <User size={12} /> Team Payout
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recipient</label>
+                                    {type === 'client_bill' ? (
+                                        <select
+                                            value={recipientId}
+                                            onChange={(e) => {
+                                                const c = clients.find(cl => cl.id === e.target.value);
+                                                setRecipientId(e.target.value);
+                                                setRecipientName(c ? c.name : '');
+                                            }}
+                                            className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                        >
+                                            <option value="">Select Client</option>
+                                            {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.company})</option>)}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            required
+                                            value={recipientName}
+                                            onChange={e => setRecipientName(e.target.value)}
+                                            placeholder="Recipient Name"
+                                            className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Currency</label>
+                                    <select
+                                        value={currency}
+                                        onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                    >
+                                        {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Due Date (Optional)</label>
+                                    <input
+                                        type="date"
+                                        value={dueDate}
+                                        onChange={e => setDueDate(e.target.value)}
+                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Linked Task (Optional)</label>
+                                    <select
+                                        value={linkedTaskId}
+                                        onChange={e => setLinkedTaskId(e.target.value)}
+                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                    >
+                                        <option value="">Select Task</option>
+                                        {tasks.filter(t => t.status !== 'done').map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Items</label>
+                                {items.map((item, index) => (
+                                    <div key={index} className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+                                        <input
+                                            required
+                                            value={item.description}
+                                            onChange={e => handleItemChange(index, 'description', e.target.value)}
+                                            placeholder="Description"
+                                            className="sm:col-span-3 bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                        />
+                                        <input
+                                            required
+                                            type="number"
+                                            value={item.quantity}
+                                            onChange={e => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                                            className="bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2 text-sm text-center font-mono text-slate-200 outline-none"
+                                        />
+                                        <input
+                                            required
+                                            type="number"
+                                            value={item.price}
+                                            onChange={e => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
+                                            className="bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2 text-sm text-center font-mono text-slate-200 outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveItem(index)}
+                                            disabled={items.length === 1}
+                                            className="p-2 text-slate-600 hover:text-red-400 disabled:opacity-30 transition-colors"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={handleAddItem}
+                                    className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 uppercase tracking-widest"
+                                >
+                                    <Plus size={12} /> Add Item
+                                </button>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-right sm:text-left">
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Amount</p>
+                                    <p className="text-2xl font-black text-indigo-400 tabular-nums">{formatCurrency(subtotal, currency)}</p>
+                                </div>
+                                <button
+                                    disabled={isSaving}
+                                    className="w-full sm:w-auto px-10 py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-black rounded-2xl transition-all shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-2"
+                                >
+                                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : 'GENERATE INVOICE'}
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <div className="space-y-3">
+                {invoices.length === 0 ? (
+                    <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-600 italic text-sm">
+                        No invoices generated yet.
+                    </div>
+                ) : (
+                    invoices.map(inv => (
+                        <div key={inv.id} className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-5 flex flex-wrap sm:flex-nowrap justify-between items-center gap-4 group">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${inv.type === 'client_bill' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                                    <FileText size={20} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-bold text-slate-100">{inv.invoice_number}</p>
+                                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${inv.type === 'client_bill' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                                            {inv.type === 'client_bill' ? 'Bill' : 'Payout'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{inv.recipient_name} • {format(new Date(inv.date), 'dd MMM yyyy')}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
+                                <div className="text-right">
+                                    <p className="text-slate-100 font-black tabular-nums">{formatCurrency(inv.total_amount, inv.currency)}</p>
+                                    <p className={`text-[10px] font-black uppercase tracking-widest ${inv.status === 'paid' ? 'text-emerald-400' : 'text-amber-400'}`}>{inv.status}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => generateInvoicePDF(inv, profile)}
+                                        className="p-2.5 bg-slate-900 hover:bg-slate-700 text-indigo-400 rounded-xl transition-all"
+                                        title="Download PDF"
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => deleteDocById('invoices', inv.id)} 
+                                        className="opacity-0 group-hover:opacity-100 p-2.5 bg-slate-900 hover:bg-red-500/20 text-slate-600 hover:text-red-400 rounded-xl transition-all"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
 export const FinancePage: React.FC = () => {
     const { user } = useAuth();
     const { exchangeRates, savings, emis } = useAppStore();
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    const [activeTab, setActiveTab] = useState<'today' | 'history' | 'savings' | 'emis'>('today');
-    const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('EUR');
+    const [activeTab, setActiveTab] = useState<'today' | 'invoices' | 'history' | 'savings' | 'emis'>('today');
+    const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('BDT');
+    const [userProfile, setUserProfile] = useState<Partial<UserProfile>>({});
+
+    // Load Profile for signature/company name
+    useEffect(() => {
+        if (user) {
+            getDocById('users', user.uid).then(p => {
+                if (p) setUserProfile(p as Partial<UserProfile>);
+            });
+        }
+    }, [user]);
     
     // Finance Entry State
     const [entries, setEntries] = useState<FinanceEntry[]>([]);
@@ -146,7 +437,7 @@ export const FinancePage: React.FC = () => {
     const [amount, setAmount] = useState('');
     const [type, setType] = useState<FinanceType>('spent');
     const [category, setCategory] = useState('Food');
-    const [entryCurrency, setEntryCurrency] = useState<CurrencyCode>('EUR');
+    const [entryCurrency, setEntryCurrency] = useState<CurrencyCode>('BDT');
     const [isSaving, setIsSaving] = useState(false);
 
     // Savings Form State
@@ -154,7 +445,7 @@ export const FinancePage: React.FC = () => {
     const [savAmount, setSavAmount] = useState('');
     const [savInstitution, setSavInstitution] = useState('');
     const [savType] = useState<'savings' | 'investment'>('savings');
-    const [savCurrency, setSavCurrency] = useState<CurrencyCode>('EUR');
+    const [savCurrency, setSavCurrency] = useState<CurrencyCode>('BDT');
 
     // EMI Form State
     const [emiTitle, setEmiTitle] = useState('');
@@ -162,7 +453,7 @@ export const FinancePage: React.FC = () => {
     const [emiTotal, setEmiTotal] = useState('');
     const [emiDueDay, setEmiDueDay] = useState('1');
     const [emiMonths] = useState('12');
-    const [emiCurrency, setEmiCurrency] = useState<CurrencyCode>('EUR');
+    const [emiCurrency, setEmiCurrency] = useState<CurrencyCode>('BDT');
 
     // Real-time listener for finance entries
     useEffect(() => {
@@ -324,7 +615,7 @@ export const FinancePage: React.FC = () => {
 
             {/* Main Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {(['today', 'history', 'savings', 'emis'] as const).map(tab => (
+                {(['today', 'invoices', 'history', 'savings', 'emis'] as const).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -456,6 +747,12 @@ export const FinancePage: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                    </motion.div>
+                )}
+
+                {activeTab === 'invoices' && (
+                    <motion.div key="invoices" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                        <InvoicesTab profile={userProfile} />
                     </motion.div>
                 )}
 
