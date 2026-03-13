@@ -6,7 +6,7 @@ import { format, addMonths, setDate as setDateFns } from 'date-fns';
 import {
     Plus, DollarSign, TrendingUp, TrendingDown, Wallet,
     Loader2, Trash2, ChevronDown, ChevronUp, CalendarDays,
-    ArrowRightLeft, Landmark, CreditCard, PieChart
+    ArrowRightLeft, Landmark, CreditCard, PieChart, Minus
 } from 'lucide-react';
 import { createDoc, deleteDocById, getDocById } from '../firebase/firestore';
 import { formatCurrency, convertCurrency } from '../utils/currencyService';
@@ -131,10 +131,123 @@ const MonthCard: React.FC<{ month: string; entries: FinanceEntry[]; displayCurre
     );
 };
 
+const InvoiceDetailsModal: React.FC<{ invoice: Invoice; profile: Partial<UserProfile>; onClose: () => void }> = ({ invoice, profile, onClose }) => {
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+            <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={onClose}
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" 
+            />
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/50 rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500" />
+                
+                <div className="p-8 overflow-y-auto custom-scrollbar">
+                    <div className="flex justify-between items-start mb-10">
+                        <div>
+                            <h2 className="text-3xl font-black text-white tracking-tighter mb-1">INVOICE</h2>
+                            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{invoice.invoice_number}</p>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-full transition-colors">
+                            <Minus size={20} className="rotate-45" />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-12 mb-12">
+                        <div className="space-y-4">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Sender</p>
+                                <p className="text-sm font-bold text-slate-100">{profile.companyName || 'TaskMaster'}</p>
+                                <p className="text-[10px] text-slate-400">{profile.fullName || profile.displayName}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Recipient</p>
+                                <p className="text-sm font-bold text-slate-100">{invoice.recipient_name}</p>
+                                <p className="text-[10px] text-slate-400 capitalize">{invoice.type.replace('_', ' ')}</p>
+                            </div>
+                        </div>
+                        <div className="text-right space-y-4">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Date Issued</p>
+                                <p className="text-sm font-bold text-slate-100">{format(new Date(invoice.date), 'dd MMMM yyyy')}</p>
+                            </div>
+                            {invoice.due_date && (
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Due Date</p>
+                                    <p className="text-sm font-bold text-red-400">{format(new Date(invoice.due_date), 'dd MMMM yyyy')}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/30 rounded-3xl border border-slate-700/30 overflow-hidden mb-8">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-700/50 bg-slate-800/50">
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Qty</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {invoice.items.map((item, i) => (
+                                    <tr key={i} className="border-b border-white/5 last:border-0">
+                                        <td className="px-6 py-4 font-bold text-slate-200">{item.description}</td>
+                                        <td className="px-6 py-4 text-center font-mono text-slate-400">{item.quantity}</td>
+                                        <td className="px-6 py-4 text-right font-black text-slate-100 tabular-nums">
+                                            {formatCurrency(item.price * item.quantity, invoice.currency)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2 mb-10">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Amount due</p>
+                        <p className="text-4xl font-black text-indigo-400 tabular-nums tracking-tighter">
+                            {formatCurrency(invoice.total_amount, invoice.currency)}
+                        </p>
+                    </div>
+
+                    {profile.signatureURL && (
+                        <div className="pt-8 border-t border-slate-800/50">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Authorized Signature</p>
+                            <img src={profile.signatureURL} alt="Signature" className="h-16 w-auto opacity-80 invert brightness-200 grayscale" />
+                            <div className="w-48 h-px bg-slate-800 mt-2" />
+                            <p className="text-[10px] font-bold text-slate-400 mt-2">{profile.fullName || profile.displayName}</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-8 bg-slate-800/50 border-t border-slate-700/50 flex gap-4">
+                    <button 
+                        onClick={() => generateInvoicePDF(invoice, profile)}
+                        className="flex-1 flex items-center justify-center gap-3 bg-indigo-500 hover:bg-indigo-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-indigo-500/20"
+                    >
+                        <Download size={20} /> DOWNLOAD PDF
+                    </button>
+                    <button onClick={onClose} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black py-4 rounded-2xl transition-all">
+                        CLOSE
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
 const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) => {
     const { invoices, clients, tasks } = useAppStore();
     const [isCreating, setIsCreating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
     // Form State
     const [type, setType] = useState<'client_bill' | 'team_payout'>('client_bill');
@@ -367,7 +480,7 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
                     </div>
                 ) : (
                     invoices.map(inv => (
-                        <div key={inv.id} className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-5 flex flex-wrap sm:flex-nowrap justify-between items-center gap-4 group">
+                        <div key={inv.id} className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-5 flex flex-wrap sm:flex-nowrap justify-between items-center gap-4 group hover:border-indigo-500/30 transition-all cursor-pointer" onClick={() => setSelectedInvoice(inv)}>
                             <div className="flex items-center gap-4">
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${inv.type === 'client_bill' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
                                     <FileText size={20} />
@@ -389,14 +502,14 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button 
-                                        onClick={() => generateInvoicePDF(inv, profile)}
+                                        onClick={(e) => { e.stopPropagation(); generateInvoicePDF(inv, profile); }}
                                         className="p-2.5 bg-slate-900 hover:bg-slate-700 text-indigo-400 rounded-xl transition-all"
                                         title="Download PDF"
                                     >
                                         <Download size={16} />
                                     </button>
                                     <button 
-                                        onClick={() => deleteDocById('invoices', inv.id)} 
+                                        onClick={(e) => { e.stopPropagation(); deleteDocById('invoices', inv.id); }} 
                                         className="opacity-0 group-hover:opacity-100 p-2.5 bg-slate-900 hover:bg-red-500/20 text-slate-600 hover:text-red-400 rounded-xl transition-all"
                                         title="Delete"
                                     >
@@ -408,6 +521,16 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
                     ))
                 )}
             </div>
+
+            <AnimatePresence>
+                {selectedInvoice && (
+                    <InvoiceDetailsModal 
+                        invoice={selectedInvoice} 
+                        profile={profile} 
+                        onClose={() => setSelectedInvoice(null)} 
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 };
