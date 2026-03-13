@@ -432,7 +432,13 @@ const VaultFiles: React.FC<{ uid: string }> = ({ uid }) => {
                 } as VaultFile;
             }));
             setLoadingFiles(false);
-        }, () => setLoadingFiles(false));
+        }, (err) => {
+            console.error('Vault files listener error:', err);
+            if (err.message.includes('index')) {
+                toast.error('Vault index is still building. Please wait a few minutes.', { id: 'index-error' });
+            }
+            setLoadingFiles(false);
+        });
         return unsub;
     }, [uid]);
 
@@ -597,6 +603,31 @@ export const Vault: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'notes' | 'files'>('notes');
 
     const uid = auth.currentUser?.uid;
+    const { clients, projects } = useAppStore();
+    const [stats, setStats] = useState({ vaultSize: 0, appSize: 0 });
+
+    // Separate listener for vault files to calculate stats
+    useEffect(() => {
+        if (!uid || !vaultUnlocked) return;
+        const q = query(
+            collection(db, `apps/${APP_ID}/vault_files`),
+            where('owner_id', '==', uid)
+        );
+        return onSnapshot(q, (snap) => {
+            const files = snap.docs.map(d => d.data() as VaultFile);
+            
+            const vaultSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
+            
+            // Calculate other app files (Clients/Projects)
+            const clientFilesSize = clients.flatMap(c => c.files || []).reduce((acc, f) => acc + (f.size || 0), 0);
+            const projectFilesSize = projects.flatMap(p => p.files || []).reduce((acc, f) => acc + (f.size || 0), 0);
+            
+            setStats({
+                vaultSize,
+                appSize: vaultSize + clientFilesSize + projectFilesSize
+            });
+        });
+    }, [uid, vaultUnlocked, clients, projects]);
 
     // Load stored vault PIN hash from Firestore
     useEffect(() => {
@@ -679,7 +710,19 @@ export const Vault: React.FC = () => {
                     </div>
                     <div>
                         <h2 className="text-slate-100 font-black text-lg">Vault Unlocked</h2>
-                        <p className="text-slate-500 text-xs">Your personal notes & private files</p>
+                        <div className="flex items-center gap-3">
+                            <p className="text-slate-500 text-xs text-nowrap">Your personal notes & private files</p>
+                            <div className="flex items-center gap-2">
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <p className="text-amber-500/80 text-[10px] font-bold uppercase tracking-wider">
+                                    Vault: {formatBytes(stats.vaultSize)}
+                                </p>
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <p className="text-indigo-400 text-[10px] font-bold uppercase tracking-wider">
+                                    Total App: {formatBytes(stats.appSize)}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <button
