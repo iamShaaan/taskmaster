@@ -163,6 +163,14 @@ const DataLoader: React.FC = () => {
       } as unknown as DailyLog)));
     }, where('owner_id', '==', user.uid));
 
+    // --- Finance ---
+    sub('finance_entries', (data) => {
+      store.setFinanceEntries(data.filter(d => !d.deleted_at).map(d => ({
+        ...d,
+        created_at: toDate(d.created_at as never) || new Date()
+      } as unknown as import('./types').FinanceEntry)));
+    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
+
     // --- Savings ---
     sub('savings', (data) => {
       store.setSavings(data.filter(d => !d.deleted_at).map(d => ({

@@ -8,7 +8,7 @@ import {
     Loader2, Trash2, ChevronDown, ChevronUp, CalendarDays,
     ArrowRightLeft, Landmark, CreditCard, PieChart
 } from 'lucide-react';
-import { createDoc, deleteDocById, listenCollection, where, orderBy, getDocById } from '../firebase/firestore';
+import { createDoc, deleteDocById, getDocById } from '../firebase/firestore';
 import { formatCurrency, convertCurrency } from '../utils/currencyService';
 import { generateInvoicePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
@@ -413,7 +413,7 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
 };
 export const FinancePage: React.FC = () => {
     const { user } = useAuth();
-    const { exchangeRates, savings, emis } = useAppStore();
+    const { exchangeRates, savings, emis, financeEntries: entries } = useAppStore();
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
@@ -430,9 +430,7 @@ export const FinancePage: React.FC = () => {
         }
     }, [user]);
     
-    // Finance Entry State
-    const [entries, setEntries] = useState<FinanceEntry[]>([]);
-    const [loadingEntries, setLoadingEntries] = useState(true);
+    // Finance Entry State - Removed local entries state and listener
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [type, setType] = useState<FinanceType>('spent');
@@ -455,25 +453,7 @@ export const FinancePage: React.FC = () => {
     const [emiMonths] = useState('12');
     const [emiCurrency, setEmiCurrency] = useState<CurrencyCode>('BDT');
 
-    // Real-time listener for finance entries
-    useEffect(() => {
-        if (!user) return;
-        setLoadingEntries(true);
-        const unsub = listenCollection(
-            'finance_entries',
-            (data) => {
-                setEntries(
-                    data.filter(d => !d.deleted_at)
-                    .map(d => ({ ...d, created_at: toDate(d.created_at) } as FinanceEntry))
-                    .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
-                );
-                setLoadingEntries(false);
-            },
-            where('owner_id', '==', user.uid),
-            orderBy('created_at', 'desc')
-        );
-        return unsub;
-    }, [user]);
+    // Real-time listener removed - now handled globally in App.tsx
 
     // Data Filtering & Calculations
     const todayEntries = useMemo(() => entries.filter(e => e.date === todayStr), [entries, todayStr]);
@@ -492,7 +472,8 @@ export const FinancePage: React.FC = () => {
     const monthlyGroups = useMemo(() => {
         const groups: Record<string, FinanceEntry[]> = {};
         entries.forEach(e => {
-            const key = format(e.created_at, 'MMMM yyyy');
+            const date = toDate(e.created_at);
+            const key = format(date, 'MMMM yyyy');
             if (!groups[key]) groups[key] = [];
             groups[key].push(e);
         });
@@ -506,6 +487,42 @@ export const FinancePage: React.FC = () => {
     const emiMonthlyTotal = useMemo(() => {
         return emis.reduce((acc, e) => acc + (exchangeRates ? convertCurrency(e.monthly_amount, e.currency || 'EUR', displayCurrency, exchangeRates) : e.monthly_amount), 0);
     }, [emis, displayCurrency, exchangeRates]);
+
+    // Monthly Calculation for Breakdown
+    const monthlyStats = useMemo(() => {
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        
+        const monthEntries = entries.filter(e => {
+            const date = toDate(e.created_at);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+        });
+
+        let earned = 0;
+        let spent = 0;
+        const dailyMap: Record<string, { earned: number, spent: number }> = {};
+
+        monthEntries.forEach(e => {
+            const dateKey = format(toDate(e.created_at), 'yyyy-MM-dd');
+            const amtConverted = exchangeRates ? convertCurrency(e.amount, e.currency || 'EUR', displayCurrency, exchangeRates) : e.amount;
+            
+            if (!dailyMap[dateKey]) dailyMap[dateKey] = { earned: 0, spent: 0 };
+            
+            if (e.type === 'earned') {
+                earned += amtConverted;
+                dailyMap[dateKey].earned += amtConverted;
+            } else {
+                spent += amtConverted;
+                dailyMap[dateKey].spent += amtConverted;
+            }
+        });
+
+        const dailyBreakdown = Object.entries(dailyMap)
+            .sort(([a], [b]) => b.localeCompare(a))
+            .map(([date, vals]) => ({ date, ...vals }));
+
+        return { earned, spent, dailyBreakdown };
+    }, [entries, displayCurrency, exchangeRates]);
 
     // Handlers
     const handleAddEntry = async (e: React.FormEvent) => {
@@ -727,25 +744,58 @@ export const FinancePage: React.FC = () => {
                             </form>
                         </div>
 
-                        {/* List */}
-                        <div className="space-y-3">
-                            <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Recent Transactions</h3>
-                            {loadingEntries ? (
-                                <div className="flex flex-col items-center py-12 gap-3 opacity-40">
-                                    <Loader2 className="animate-spin text-indigo-500" size={24} />
-                                    <span className="text-xs font-bold tracking-widest">FETCHING DATA...</span>
+                        {/* List & Monthly Breakdown */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 space-y-3">
+                                <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Today's Transactions</h3>
+                                {todayEntries.length === 0 ? (
+                                    <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-600 italic text-sm">
+                                        No entries recorded for today.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <AnimatePresence mode="popLayout">
+                                            {todayEntries.map(e => <EntryRow key={e.id} entry={e} onDelete={(id) => deleteDocById('finance_entries', id)} />)}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="bg-slate-800/40 border border-slate-700/50 rounded-3xl p-5 space-y-4">
+                                    <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-700/50 pb-2">
+                                        {format(today, 'MMMM')} Summary
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Income</p>
+                                            <p className="text-lg font-black text-emerald-400 tabular-nums">{formatCurrency(monthlyStats.earned, displayCurrency)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase">Spending</p>
+                                            <p className="text-lg font-black text-red-400 tabular-nums">{formatCurrency(monthlyStats.spent, displayCurrency)}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2 pt-2">
+                                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Daily Breakdown</p>
+                                        <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {monthlyStats.dailyBreakdown.map(day => (
+                                                <div key={day.date} className="flex items-center justify-between p-2 rounded-xl bg-slate-900/50 border border-white/5">
+                                                    <span className="text-[10px] font-bold text-slate-400">{format(new Date(day.date), 'dd MMM')}</span>
+                                                    <div className="flex gap-3">
+                                                        {day.earned > 0 && <span className="text-[10px] font-black text-emerald-400 tabular-nums">+{formatCurrency(day.earned, displayCurrency)}</span>}
+                                                        {day.spent > 0 && <span className="text-[10px] font-black text-red-400 tabular-nums">-{formatCurrency(day.spent, displayCurrency)}</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {monthlyStats.dailyBreakdown.length === 0 && (
+                                                <p className="text-center text-[10px] text-slate-600 py-4 italic">No activity this month</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                            ) : todayEntries.length === 0 ? (
-                                <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-600 italic text-sm">
-                                    No entries recorded for today.
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <AnimatePresence mode="popLayout">
-                                        {todayEntries.map(e => <EntryRow key={e.id} entry={e} onDelete={(id) => deleteDocById('finance_entries', id)} />)}
-                                    </AnimatePresence>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -865,9 +915,7 @@ export const FinancePage: React.FC = () => {
                             </h3>
                             <button className="text-[10px] font-black uppercase text-indigo-400 hover:underline">Export CSV</button>
                         </header>
-                        {loadingEntries ? (
-                            <div className="flex justify-center py-20 opacity-30"><Loader2 className="animate-spin" /></div>
-                        ) : monthlyGroups.length === 0 ? (
+                        {entries.length === 0 ? (
                             <div className="py-20 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 italic">Financial data history is empty.</div>
                         ) : (
                             monthlyGroups.map(([month, monthEntries]) => (

@@ -35,6 +35,9 @@ interface AppStore {
     setDailyLogs: (logs: DailyLog[]) => void;
 
     // Finance (Global state for calculations)
+    financeEntries: import('../types').FinanceEntry[];
+    setFinanceEntries: (entries: import('../types').FinanceEntry[]) => void;
+
     savings: import('../types').SavingEntry[];
     setSavings: (savings: import('../types').SavingEntry[]) => void;
     
@@ -84,6 +87,9 @@ export const useAppStore = create<AppStore>((set) => ({
 
     dailyLogs: [],
     setDailyLogs: (dailyLogs) => set({ dailyLogs }),
+
+    financeEntries: [],
+    setFinanceEntries: (financeEntries) => set({ financeEntries }),
 
     savings: [],
     setSavings: (savings) => set({ savings }),
