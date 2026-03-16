@@ -583,6 +583,26 @@ export const FinancePage: React.FC = () => {
             setIsSaving(false);
         }
     };
+
+    const handleClearToday = async () => {
+        if (!window.confirm(`Clear all ${todayEntries.length} entr${todayEntries.length === 1 ? 'y' : 'ies'} from today?`)) return;
+        try {
+            await Promise.all(todayEntries.map(e => deleteDocById('finance_entries', e.id)));
+            toast.success('Today\'s entries cleared');
+        } catch {
+            toast.error('Failed to clear today\'s entries');
+        }
+    };
+
+    const handleClearHistory = async () => {
+        if (!window.confirm('Delete ALL finance transaction history? This cannot be undone.')) return;
+        try {
+            await Promise.all(entries.map(e => deleteDocById('finance_entries', e.id)));
+            toast.success('History cleared');
+        } catch {
+            toast.error('Failed to clear history');
+        }
+    };
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [type, setType] = useState<FinanceType>('spent');
@@ -906,7 +926,17 @@ export const FinancePage: React.FC = () => {
                         {/* List & Monthly Breakdown */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2 space-y-3">
-                                <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Today's Transactions</h3>
+                                <div className="flex items-center justify-between pl-1">
+                                    <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest">Today's Transactions</h3>
+                                    {todayEntries.length > 0 && (
+                                        <button
+                                            onClick={handleClearToday}
+                                            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+                                        >
+                                            <Trash2 size={11} /> Clear Today
+                                        </button>
+                                    )}
+                                </div>
                                 {todayEntries.length === 0 ? (
                                     <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-600 italic text-sm">
                                         No entries recorded for today.
@@ -1072,7 +1102,17 @@ export const FinancePage: React.FC = () => {
                             <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest flex items-center gap-2">
                                 <CalendarDays size={14} className="text-indigo-400" /> Historical Logs
                             </h3>
-                            <button className="text-[10px] font-black uppercase text-indigo-400 hover:underline">Export CSV</button>
+                            <div className="flex items-center gap-4">
+                                <button className="text-[10px] font-black uppercase text-indigo-400 hover:underline">Export CSV</button>
+                                {entries.length > 0 && (
+                                    <button
+                                        onClick={handleClearHistory}
+                                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+                                    >
+                                        <Trash2 size={11} /> Clear History
+                                    </button>
+                                )}
+                            </div>
                         </header>
                         {entries.length === 0 ? (
                             <div className="py-20 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 italic">Financial data history is empty.</div>
