@@ -96,6 +96,11 @@ export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<User
             
             // Add signature image (fetch as base64 first to avoid async rendering issues in jsPDF)
             const base64Img = await getBase64ImageFromUrl(profile.signatureURL);
+            
+            // Draw a subtle dark background rectangle for the signature so white text is visible
+            doc.setFillColor(30, 41, 59); // Tailwind slate-800 equivalent
+            doc.roundedRect(18, signatureY + 3, 44, 24, 2, 2, 'F');
+            
             doc.addImage(base64Img, 'PNG', 20, signatureY + 5, 40, 20);
             
             const lineY = signatureY + 28;
