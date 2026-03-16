@@ -112,15 +112,24 @@ const MonthCard: React.FC<{ month: string; entries: FinanceEntry[]; displayCurre
                     >
                         <div className="p-4 space-y-2">
                             {entries.map(e => (
-                                <div key={e.id} className="flex items-center justify-between text-xs">
+                                <div key={e.id} className="group flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2">
                                         <span className={`w-1.5 h-1.5 rounded-full ${e.type === 'earned' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                                         <span className="text-slate-300">{e.description}</span>
                                         <span className="text-slate-600 font-medium tracking-tight">({formatCurrency(e.amount, e.currency || 'EUR')})</span>
                                     </div>
-                                    <span className={`font-bold tabular-nums ${e.type === 'earned' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {rates ? formatCurrency(convertCurrency(e.amount, e.currency || 'EUR', displayCurrency, rates), displayCurrency) : formatCurrency(e.amount, e.currency || 'EUR')}
-                                    </span>
+                                    <div className="flex items-center gap-4">
+                                        <span className={`font-bold tabular-nums ${e.type === 'earned' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            {rates ? formatCurrency(convertCurrency(e.amount, e.currency || 'EUR', displayCurrency, rates), displayCurrency) : formatCurrency(e.amount, e.currency || 'EUR')}
+                                        </span>
+                                        <button 
+                                            onClick={(ev) => { ev.stopPropagation(); deleteDocById('finance_entries', e.id); }}
+                                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-600 hover:text-red-400 transition-all"
+                                            title="Delete Entry"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -553,7 +562,27 @@ export const FinancePage: React.FC = () => {
         }
     }, [user]);
     
-    // Finance Entry State - Removed local entries state and listener
+    const { invoices, clients, tasks } = useAppStore();
+
+    const handleClearAll = async () => {
+        if (!window.confirm('Are you sure you want to clear ALL finance data? This includes transactions, invoices, savings, and EMIs.')) return;
+        
+        setIsSaving(true);
+        try {
+            const promises = [
+                ...entries.map(e => deleteDocById('finance_entries', e.id)),
+                ...invoices.map(i => deleteDocById('invoices', i.id)),
+                ...savings.map(s => deleteDocById('savings', s.id)),
+                ...emis.map(e => deleteDocById('emis', e.id))
+            ];
+            await Promise.all(promises);
+            toast.success('All finance data cleared');
+        } catch (err) {
+            toast.error('Failed to clear some data');
+        } finally {
+            setIsSaving(false);
+        }
+    };
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [type, setType] = useState<FinanceType>('spent');
@@ -749,6 +778,13 @@ export const FinancePage: React.FC = () => {
                     <div className="w-px h-4 bg-slate-700 mx-1" />
                     <button className="p-1.5 text-slate-400 hover:text-amber-400" title="Daily Exchange Rates">
                         <ArrowRightLeft size={14} />
+                    </button>
+                    <button 
+                        onClick={handleClearAll}
+                        className="p-1.5 text-slate-500 hover:text-red-400 transition-colors" 
+                        title="Clear All Finance Data"
+                    >
+                        <Trash2 size={14} />
                     </button>
                 </div>
             </header>
