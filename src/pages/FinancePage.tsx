@@ -261,11 +261,9 @@ const InvoiceDetailsModal: React.FC<{ invoice: Invoice; profile: Partial<UserPro
     );
 };
 
-const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) => {
-    const { invoices, clients, tasks, projects } = useAppStore();
-    const [isCreating, setIsCreating] = useState(false);
+const CreateInvoiceTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) => {
+    const { clients, tasks, projects } = useAppStore();
     const [isSaving, setIsSaving] = useState(false);
-    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
     // Form State
     const [type, setType] = useState<'client_bill' | 'team_payout'>('client_bill');
@@ -352,7 +350,6 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
 
             await createDoc('invoices', newInvoice);
             toast.success('Invoice created');
-            setIsCreating(false);
             setItems([{ description: '', quantity: 1, price: 0 }]);
             setRecipientId('');
             setRecipientName('');
@@ -369,24 +366,10 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Billing & Invoices</h3>
-                <button
-                    onClick={() => setIsCreating(!isCreating)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20"
-                >
-                    {isCreating ? 'CANCEL' : <><Plus size={14} /> NEW INVOICE</>}
-                </button>
+                <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest pl-1">Create New Invoice</h3>
             </div>
 
-            <AnimatePresence>
-                {isCreating && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                    >
-                        <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-slate-700/50 rounded-3xl p-6 space-y-5 relative">
+            <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-slate-700/50 rounded-3xl p-6 space-y-5 relative">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -570,11 +553,17 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
                                     {isSaving ? <Loader2 size={18} className="animate-spin" /> : 'GENERATE INVOICE'}
                                 </button>
                             </div>
-                        </form>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            </form>
+        </div>
+    );
+};
 
+const InvoicesListTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) => {
+    const { invoices } = useAppStore();
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+    return (
+        <div className="space-y-6">
             <div className="space-y-3">
                 {invoices.length === 0 ? (
                     <div className="bg-slate-800/20 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-600 italic text-sm">
@@ -646,7 +635,7 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    const [activeTab, setActiveTab] = useState<'today' | 'invoices' | 'history' | 'savings' | 'emis'>(viewMode === 'history' ? 'history' : 'today');
+    const [activeTab, setActiveTab] = useState<'today' | 'invoices' | 'new_invoice' | 'history' | 'savings' | 'emis'>(viewMode === 'history' ? 'history' : 'today');
     const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('BDT');
     const [userProfile, setUserProfile] = useState<Partial<UserProfile>>({});
 
@@ -910,7 +899,7 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {(viewMode === 'history' 
                     ? (['history', 'invoices'] as const)
-                    : (['today', 'savings', 'emis'] as const)
+                    : (['today', 'new_invoice', 'savings', 'emis'] as const)
                 ).map(tab => (
                     <button
                         key={tab}
@@ -921,7 +910,7 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
                                 : 'bg-slate-800/40 text-slate-500 border-2 border-transparent hover:bg-slate-800 hover:text-slate-300'
                         }`}
                     >
-                        {tab === 'emis' ? 'EMIs' : tab}
+                        {tab === 'emis' ? 'EMIs' : tab === 'new_invoice' ? 'New Invoice' : tab}
                     </button>
                 ))}
             </div>
@@ -1091,7 +1080,13 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
 
                 {activeTab === 'invoices' && (
                     <motion.div key="invoices" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                        <InvoicesTab profile={userProfile} />
+                        <InvoicesListTab profile={userProfile} />
+                    </motion.div>
+                )}
+
+                {activeTab === 'new_invoice' && (
+                    <motion.div key="new_invoice" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                        <CreateInvoiceTab profile={userProfile} />
                     </motion.div>
                 )}
 
