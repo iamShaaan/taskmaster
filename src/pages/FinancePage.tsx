@@ -13,7 +13,7 @@ import { formatCurrency, convertCurrency } from '../utils/currencyService';
 import { generateInvoicePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
 import type { FinanceEntry, CurrencyCode, FinanceType, Invoice, InvoiceItem, UserProfile } from '../types';
-import { FileText, Download, User, Briefcase } from 'lucide-react';
+import { FileText, Download, User, Briefcase, Sparkles } from 'lucide-react';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Entertainment', 'Bills', 'Other'];
@@ -219,6 +219,15 @@ const InvoiceDetailsModal: React.FC<{ invoice: Invoice; profile: Partial<UserPro
                         </table>
                     </div>
 
+                    {invoice.note && (
+                        <div className="mb-8 p-6 bg-slate-800/40 rounded-3xl border border-slate-700/30">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <Sparkles size={12} className="text-indigo-400" /> AI Generated Note
+                            </p>
+                            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{invoice.note}</p>
+                        </div>
+                    )}
+
                     <div className="flex flex-col items-end gap-2 mb-10">
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Amount due</p>
                         <p className="text-4xl font-black text-indigo-400 tabular-nums tracking-tighter">
@@ -253,7 +262,7 @@ const InvoiceDetailsModal: React.FC<{ invoice: Invoice; profile: Partial<UserPro
 };
 
 const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) => {
-    const { invoices, clients, tasks } = useAppStore();
+    const { invoices, clients, tasks, projects } = useAppStore();
     const [isCreating, setIsCreating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -265,7 +274,9 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
     const [currency, setCurrency] = useState<CurrencyCode>('BDT');
     const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, price: 0 }]);
     const [dueDate, setDueDate] = useState('');
-    const [linkedTaskId, setLinkedTaskId] = useState('');
+    const [linkedProjectId, setLinkedProjectId] = useState('');
+    const [linkedTaskIds, setLinkedTaskIds] = useState<string[]>([]);
+    const [note, setNote] = useState('');
 
     const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
@@ -275,6 +286,39 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
         const newItems = [...items];
         newItems[index] = { ...newItems[index], [field]: value };
         setItems(newItems);
+    };
+
+    const handleGenerateNote = () => {
+        if (!recipientName) {
+            toast.error('Please select a recipient first');
+            return;
+        }
+
+        let aiNote = `Invoice for services rendered to ${recipientName}.`;
+        
+        const proj = projects.find(p => p.id === linkedProjectId);
+        if (proj) {
+            aiNote += `\n\nProject: ${proj.name}`;
+        }
+
+        if (linkedTaskIds.length > 0) {
+            aiNote += `\n\nCompleted Details:`;
+            linkedTaskIds.forEach(tId => {
+                const t = tasks.find(ta => ta.id === tId);
+                if (t) aiNote += `\n- ${t.title}`;
+            });
+        }
+        
+        aiNote += `\n\nThank you for your business!\nBest regards,\n${profile.fullName || profile.displayName || 'TaskMaster'}`;
+
+        setNote(aiNote);
+        toast.success('AI Note Generated!');
+    };
+
+    const toggleTask = (taskId: string) => {
+        setLinkedTaskIds(prev => 
+            prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+        );
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -298,7 +342,9 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
                 items,
                 currency,
                 status: 'sent',
-                linked_task_id: linkedTaskId || undefined,
+                linked_project_id: linkedProjectId || undefined,
+                linked_task_ids: linkedTaskIds,
+                note: note || undefined,
                 owner_id: profile.uid || '',
                 total_amount: subtotal,
                 created_at: new Date()
@@ -310,6 +356,9 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
             setItems([{ description: '', quantity: 1, price: 0 }]);
             setRecipientId('');
             setRecipientName('');
+            setLinkedProjectId('');
+            setLinkedTaskIds([]);
+            setNote('');
         } catch (err) {
             toast.error('Failed to create invoice');
         } finally {
@@ -400,25 +449,69 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
                                     </select>
                                 </div>
                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Project (Optional)</label>
+                                    <select
+                                        value={linkedProjectId}
+                                        onChange={e => {
+                                            setLinkedProjectId(e.target.value);
+                                            setLinkedTaskIds([]); // Reset tasks when project changes
+                                        }}
+                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                    >
+                                        <option value="">Select Project</option>
+                                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Due Date (Optional)</label>
                                     <input
                                         type="date"
                                         value={dueDate}
                                         onChange={e => setDueDate(e.target.value)}
-                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
+                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Linked Task (Optional)</label>
-                                    <select
-                                        value={linkedTaskId}
-                                        onChange={e => setLinkedTaskId(e.target.value)}
-                                        className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50"
-                                    >
-                                        <option value="">Select Task</option>
-                                        {tasks.filter(t => t.status !== 'done').map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-                                    </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Linked Tasks (Optional)</label>
+                                <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 max-h-32 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+                                    {tasks.filter(t => t.status !== 'done' && (!linkedProjectId || t.project_id === linkedProjectId)).length === 0 ? (
+                                        <p className="text-xs text-slate-500 italic px-2 py-1">No pending tasks found.</p>
+                                    ) : (
+                                        tasks.filter(t => t.status !== 'done' && (!linkedProjectId || t.project_id === linkedProjectId)).map(t => (
+                                            <label key={t.id} className="flex items-center gap-3 p-2 hover:bg-slate-800/80 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-700/50">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={linkedTaskIds.includes(t.id)}
+                                                    onChange={() => toggleTask(t.id)}
+                                                    className="w-4 h-4 rounded border-slate-600 text-indigo-500 focus:ring-indigo-500/30 bg-slate-900" 
+                                                />
+                                                <span className="text-sm text-slate-300 truncate">{t.title}</span>
+                                            </label>
+                                        ))
+                                    )}
                                 </div>
+                            </div>
+
+                            <div className="space-y-2 relative">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Invoice Note</label>
+                                    <button
+                                        type="button"
+                                        onClick={handleGenerateNote}
+                                        className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 uppercase tracking-widest"
+                                    >
+                                        <Sparkles size={12} /> Auto-Generate
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={note}
+                                    onChange={e => setNote(e.target.value)}
+                                    placeholder="Thank you for your business..."
+                                    rows={4}
+                                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-indigo-500/50 custom-scrollbar resize-none"
+                                />
                             </div>
 
                             <div className="space-y-3">

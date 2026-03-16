@@ -58,7 +58,22 @@ export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<User
         margin: { left: 20, right: 20 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+
+    // ─── Note ───
+    if (invoice.note) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('Note:', 20, finalY);
+        doc.setFont('helvetica', 'normal');
+        
+        // Split text to fit page width
+        const splitNote = doc.splitTextToSize(invoice.note, pageWidth - 40);
+        doc.text(splitNote, 20, finalY + 5);
+        
+        // Adjust finalY based on note lines
+        finalY += (splitNote.length * 5) + 10;
+    }
 
     // ─── Total ───
     doc.setFont('helvetica', 'bold');

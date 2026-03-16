@@ -221,7 +221,10 @@ export interface Invoice {
     items: InvoiceItem[];
     currency: CurrencyCode;
     status: 'draft' | 'sent' | 'paid' | 'overdue';
-    linked_task_id?: string;
+    linked_project_id?: string;
+    linked_task_ids?: string[]; // Arrays of task IDs instead of a single ID
+    linked_task_id?: string;    // Legacy compat
+    note?: string;              // AI Generated Note
     owner_id: string;
     created_at: Date;
     total_amount: number;
