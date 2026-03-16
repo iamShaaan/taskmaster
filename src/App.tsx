@@ -102,13 +102,15 @@ const DataLoader: React.FC = () => {
 
     // --- Meetings ---
     sub('meetings', (data) => {
-      store.setMeetings(data.filter(d => !d.deleted_at).map(d => ({
+      const sorted = data.filter(d => !d.deleted_at).map(d => ({
         ...d,
         start_time: toDate(d.start_time as never) || new Date(),
         end_time: toDate(d.end_time as never) || new Date(),
         created_at: toDate(d.created_at as never) || new Date(),
-      } as unknown as Meeting)));
-    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
+      } as unknown as Meeting))
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+      store.setMeetings(sorted);
+    }, where('owner_id', '==', user.uid));
 
     // --- Notes (No orderBy yet to ensure visibility of old notes for auto-healing) ---
     sub('notes', (data) => {
@@ -165,11 +167,13 @@ const DataLoader: React.FC = () => {
 
     // --- Finance ---
     sub('finance_entries', (data) => {
-      store.setFinanceEntries(data.filter(d => !d.deleted_at).map(d => ({
+      const sorted = data.filter(d => !d.deleted_at).map(d => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date()
-      } as unknown as import('./types').FinanceEntry)));
-    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
+      } as unknown as import('./types').FinanceEntry))
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+      store.setFinanceEntries(sorted);
+    }, where('owner_id', '==', user.uid));
 
     // --- Savings ---
     sub('savings', (data) => {
@@ -189,11 +193,13 @@ const DataLoader: React.FC = () => {
 
     // --- Invoices ---
     sub('invoices', (data) => {
-      store.setInvoices(data.filter(d => !d.deleted_at).map(d => ({
+      const sorted = data.filter(d => !d.deleted_at).map(d => ({
         ...d,
         created_at: toDate(d.created_at as never) || new Date()
-      } as unknown as Invoice)));
-    }, where('owner_id', '==', user.uid), orderBy('created_at', 'desc'));
+      } as unknown as Invoice))
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+      store.setInvoices(sorted);
+    }, where('owner_id', '==', user.uid));
 
     return () => unsubs.forEach((u) => u());
   }, [user?.uid]);
