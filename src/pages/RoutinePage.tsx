@@ -44,18 +44,16 @@ export const RoutinePage: React.FC = () => {
     // Filter logs for today
     const logsToday = useMemo(() => dailyLogs.filter(l => l.date === todayStr), [dailyLogs, todayStr]);
 
-    // Filter and sort active routines
+    // Filter and sort active routines by creation date instead of time
     const activeRoutines = useMemo(() => {
-        return routines
+        return [...routines]
             .filter(r => !r.is_archived)
             .sort((a, b) => {
-                const timeA = a.start_time || (a as any).time || '00:00';
-                const timeB = b.start_time || (b as any).time || '00:00';
-                return timeA.localeCompare(timeB);
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                return dateB - dateA; // Newest first
             });
     }, [routines]);
-
-    // Derived stats
     const { completionRate, completedCount } = useMemo(() => {
         if (activeRoutines.length === 0) return { completionRate: 0, completedCount: 0 };
         const completed = activeRoutines.filter(r => {
@@ -78,13 +76,17 @@ export const RoutinePage: React.FC = () => {
 
         try {
             if (existingLog) {
-                await updateDocById('daily_logs', existingLog.id, { completed: newStatus });
+                await updateDocById('daily_logs', existingLog.id, { 
+                    completed: newStatus,
+                    ...(newStatus ? { completed_at: new Date() } : { completed_at: null }) 
+                });
             } else {
                 await createDoc('daily_logs', {
                     date: todayStr,
                     routine_id: routineId,
                     completed: newStatus,
                     owner_id: user.uid,
+                    ...(newStatus ? { completed_at: new Date() } : {})
                 });
             }
         } catch (error) {
@@ -136,6 +138,20 @@ export const RoutinePage: React.FC = () => {
         e.preventDefault();
     };
 
+    const handleResetRoutine = async () => {
+        if (!confirm('Are you sure you want to reset all routines for today?')) return;
+        try {
+            const promises = logsToday.map(log => 
+                updateDocById('daily_logs', log.id, { completed: false, completed_at: null })
+            );
+            await Promise.all(promises);
+            toast.success('Routines reset for today');
+        } catch (error) {
+            console.error('Failed to reset routines:', error);
+            toast.error('Failed to reset routines');
+        }
+    };
+
     const displayGroup = activeTab === 'all' 
         ? activeRoutines 
         : activeRoutines.filter(r => r.category === activeTab);
@@ -156,16 +172,27 @@ export const RoutinePage: React.FC = () => {
                     </h1>
                     <p className="text-slate-400 text-sm mt-1">{displayDate} • {activeRoutines.length} items scheduled</p>
                 </div>
-                <button
-                    onClick={() => {
-                        setRoutineToEdit(null);
-                        setIsFormOpen(true);
-                    }}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all flex items-center justify-center gap-2"
-                >
-                    <Plus size={18} />
-                    <span>Add Routine</span>
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                    {completedCount > 0 && (
+                        <button
+                            onClick={handleResetRoutine}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Activity size={18} />
+                            <span>Reset Today</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => {
+                            setRoutineToEdit(null);
+                            setIsFormOpen(true);
+                        }}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all flex items-center justify-center gap-2"
+                    >
+                        <Plus size={18} />
+                        <span>Add Routine</span>
+                    </button>
+                </div>
             </header>
 
             {/* Quick Stats */}
@@ -283,10 +310,12 @@ export const RoutinePage: React.FC = () => {
                                                 {routine.title}
                                             </p>
                                             <div className="flex items-center gap-3 mt-1">
-                                                <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium">
-                                                    <Clock size={12} />
-                                                    {routine.start_time || (routine as any).time || 'No time'} {routine.end_time ? `- ${routine.end_time}` : ''}
-                                                </div>
+                                                {isCompleted && log?.completed_at && (
+                                                    <div className="flex items-center gap-1.5 text-indigo-400 text-xs font-bold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                                                        <Clock size={12} />
+                                                        Done at {format(new Date((log.completed_at as any).seconds ? (log.completed_at as any).toDate() : log.completed_at), 'h:mm a')}
+                                                    </div>
+                                                )}
                                                 <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${catColor.bg} ${catColor.text}`}>
                                                     {CatIcon && <CatIcon size={10} />}
                                                     {catColor.label}

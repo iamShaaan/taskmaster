@@ -179,8 +179,8 @@ export interface Routine {
     id: string;
     title: string;
     category: RoutineCategory;
-    start_time: string; // e.g., "08:00"
-    end_time: string; // e.g., "09:00"
+    start_time?: string; // Legacy: e.g., "08:00"
+    end_time?: string;   // Legacy: e.g., "09:00"
     linked_task_id?: string | null;
     owner_id: string;
     created_at: Date;
@@ -192,6 +192,7 @@ export interface DailyLog {
     date: string; // Format: "YYYY-MM-DD"
     routine_id?: string;
     completed?: boolean;
+    completed_at?: Date;
     spent?: number;
     earned?: number;
     owner_id: string;
