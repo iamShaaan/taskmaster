@@ -246,6 +246,7 @@ function App() {
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:id" element={<ProjectDetail />} />
               <Route path="routine" element={<RoutinePage />} />
+              <Route path="finance" element={<FinancePage viewMode="dashboard" />} />
               <Route path="user-data" element={<UserDataLayout />}>
                 <Route index element={<Clients />} />
                 <Route path="clients/:id" element={<ClientDetail />} />
@@ -253,7 +254,7 @@ function App() {
                 <Route path="archive" element={<ArchivePage />} />
                 <Route path="time-tracker" element={<TimeTracker />} />
                 <Route path="vault" element={<Vault />} />
-                <Route path="finance" element={<FinancePage />} />
+                <Route path="finance" element={<FinancePage viewMode="history" />} />
               </Route>
 
               <Route path="*" element={<Dashboard />} />

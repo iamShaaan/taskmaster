@@ -543,13 +543,17 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
         </div>
     );
 };
-export const FinancePage: React.FC = () => {
+export interface FinancePageProps {
+    viewMode?: 'dashboard' | 'history';
+}
+
+export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard' }) => {
     const { user } = useAuth();
     const { exchangeRates, savings, emis, financeEntries: entries, invoices } = useAppStore();
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    const [activeTab, setActiveTab] = useState<'today' | 'invoices' | 'history' | 'savings' | 'emis'>('today');
+    const [activeTab, setActiveTab] = useState<'today' | 'invoices' | 'history' | 'savings' | 'emis'>(viewMode === 'history' ? 'history' : 'today');
     const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('BDT');
     const [userProfile, setUserProfile] = useState<Partial<UserProfile>>({});
 
@@ -811,7 +815,10 @@ export const FinancePage: React.FC = () => {
 
             {/* Main Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {(['today', 'invoices', 'history', 'savings', 'emis'] as const).map(tab => (
+                {(viewMode === 'history' 
+                    ? (['history', 'invoices'] as const)
+                    : (['today', 'savings', 'emis'] as const)
+                ).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
