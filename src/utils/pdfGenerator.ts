@@ -1,16 +1,11 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import type { Invoice, UserProfile } from '../types';
 import { formatCurrency } from './currencyService';
 
-// Extend jsPDF with autotable types
-interface jsPDFWithAutoTable extends jsPDF {
-    autoTable: (options: any) => jsPDF;
-}
-
 export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<UserProfile>) => {
-    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
 
     // ─── Header ───
@@ -48,12 +43,12 @@ export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<User
         formatCurrency(item.price * item.quantity, invoice.currency)
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
         startY: 75,
         head: [['Description', 'Qty', 'Unit Price', 'Total']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillStyle: 'indigo', fillColor: [79, 70, 229] }, // indigo-600
+        headStyles: { fillColor: [79, 70, 229] }, // indigo-600
         styles: { fontSize: 10, cellPadding: 5 },
         margin: { left: 20, right: 20 }
     });
