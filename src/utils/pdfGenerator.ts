@@ -4,6 +4,17 @@ import { format } from 'date-fns';
 import type { Invoice, UserProfile } from '../types';
 import { formatCurrency } from './currencyService';
 
+const getBase64ImageFromUrl = async (imageUrl: string) => {
+    const res = await fetch(imageUrl);
+    const blob = await res.blob();
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
+
 export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<UserProfile>) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -83,9 +94,9 @@ export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<User
             doc.setFontSize(10);
             doc.text('Authorized Signature:', 20, signatureY);
             
-            // Add signature image (making it transparent/inverted if needed)
-            // Note: jspdf handles base64 or URL. We hope CORS allows direct URL if it's from Firebase.
-            doc.addImage(profile.signatureURL, 'PNG', 20, signatureY + 5, 40, 20);
+            // Add signature image (fetch as base64 first to avoid async rendering issues in jsPDF)
+            const base64Img = await getBase64ImageFromUrl(profile.signatureURL);
+            doc.addImage(base64Img, 'PNG', 20, signatureY + 5, 40, 20);
             
             const lineY = signatureY + 28;
             doc.line(20, lineY, 80, lineY);
