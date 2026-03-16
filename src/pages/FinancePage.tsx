@@ -545,7 +545,7 @@ const InvoicesTab: React.FC<{ profile: Partial<UserProfile> }> = ({ profile }) =
 };
 export const FinancePage: React.FC = () => {
     const { user } = useAuth();
-    const { exchangeRates, savings, emis, financeEntries: entries } = useAppStore();
+    const { exchangeRates, savings, emis, financeEntries: entries, invoices } = useAppStore();
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
 
@@ -562,7 +562,7 @@ export const FinancePage: React.FC = () => {
         }
     }, [user]);
     
-    const { invoices, clients, tasks } = useAppStore();
+
 
     const handleClearAll = async () => {
         if (!window.confirm('Are you sure you want to clear ALL finance data? This includes transactions, invoices, savings, and EMIs.')) return;
