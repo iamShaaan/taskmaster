@@ -11,8 +11,7 @@ import {
     ChevronRight,
     Sparkles,
     LogOut,
-    ListTodo,
-    Wallet
+    ListTodo
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { db, APP_ID } from '../../firebase/config';
@@ -23,8 +22,7 @@ const navItems = [
     { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { to: '/meetings', icon: Calendar, label: 'Meetings' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
-    { to: '/routine', icon: ListTodo, label: 'Daily Routine' },
-    { to: '/finance', icon: Wallet, label: 'Finance' },
+    { to: '/routine', icon: ListTodo, label: 'Checklist' },
     { to: '/user-data', icon: Users, label: 'User Data' },
 ];
 

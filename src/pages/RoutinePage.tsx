@@ -167,7 +167,7 @@ export const RoutinePage: React.FC = () => {
             <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-2">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight flex items-center gap-3">
-                        Daily Routine
+                        Checklist
                         <Sparkles size={24} className="text-indigo-400" />
                     </h1>
                     <p className="text-slate-400 text-sm mt-1">{displayDate} • {activeRoutines.length} items scheduled</p>
