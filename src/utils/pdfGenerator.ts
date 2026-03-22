@@ -4,14 +4,37 @@ import { format } from 'date-fns';
 import type { Invoice, UserProfile } from '../types';
 import { formatCurrency } from './currencyService';
 
-const getBase64ImageFromUrl = async (imageUrl: string) => {
-    const res = await fetch(imageUrl);
-    const blob = await res.blob();
-    return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+const getBase64ImageFromUrl = (imageUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject('No canvas context');
+            
+            // Draw a white background so black signatures show up clearly
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => {
+            // Fallback if crossOrigin fails (CORS block without headers)
+            fetch(imageUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                })
+                .catch(reject);
+        };
+        img.src = imageUrl;
     });
 };
 
@@ -19,32 +42,84 @@ export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<User
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
 
-    // ─── Header ───
-    doc.setFontSize(22);
+    // ─── Colors ───
+    const brandIndigo = [79, 70, 229] as [number, number, number]; // #4f46e5
+    const brandSlate = [15, 23, 42] as [number, number, number];    // #0f172a
+    const mutedSlate = [100, 116, 139] as [number, number, number];  // #64748b
+    const brandEmerald = [16, 185, 129] as [number, number, number]; // #10b981
+
+    // ─── Top Header Accent ───
+    doc.setFillColor(...brandIndigo);
+    doc.rect(0, 0, pageWidth, 6, 'F'); // Small sleek top colored bar
+
+    // ─── Document Title ───
+    doc.setFontSize(36);
     doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', 20, 20);
+    doc.setTextColor(...brandSlate);
+    doc.text('INVOICE', 20, 28);
     
+    // Tiny colored square accent
+    doc.setFillColor(...brandEmerald);
+    doc.rect(20, 32, 10, 3, 'F');
+
+    // ─── Invoice Meta ───
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...brandSlate);
+    doc.text(`Invoice #`, 20, 48);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Invoice #: ${invoice.invoice_number}`, 20, 28);
-    doc.text(`Date: ${format(new Date(invoice.date), 'dd MMM yyyy')}`, 20, 33);
+    doc.setTextColor(...mutedSlate);
+    doc.text(invoice.invoice_number, 50, 48);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...brandSlate);
+    doc.text(`Date`, 20, 54);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...mutedSlate);
+    doc.text(format(new Date(invoice.date), 'dd MMM yyyy'), 50, 54);
+
     if (invoice.due_date) {
-        doc.text(`Due Date: ${format(new Date(invoice.due_date), 'dd MMM yyyy')}`, 20, 38);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...brandSlate);
+        doc.text(`Due Date`, 20, 60);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...mutedSlate);
+        doc.text(format(new Date(invoice.due_date), 'dd MMM yyyy'), 50, 60);
     }
 
-    // ─── Company Info ───
+    // ─── Company Info (Right Aligned) ───
     const companyX = pageWidth - 20;
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(profile.companyName || 'TaskMaster Ecosystem', companyX, 20, { align: 'right' });
+    doc.setTextColor(...brandIndigo);
+    doc.text(profile.companyName || 'TaskMaster Ecosystem', companyX, 28, { align: 'right' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...brandSlate);
+    doc.text(profile.fullName || profile.displayName || 'Independent Contractor', companyX, 35, { align: 'right' });
+    
     doc.setFont('helvetica', 'normal');
-    doc.text(profile.fullName || profile.displayName || '', companyX, 25, { align: 'right' });
-    doc.text(profile.professionalEmail || profile.personalEmail || '', companyX, 30, { align: 'right' });
+    doc.setTextColor(...mutedSlate);
+    doc.text(profile.professionalEmail || profile.personalEmail || '', companyX, 40, { align: 'right' });
 
-    // ─── Bill To / Payout To ───
+    // ─── Bill To / Payout To Block ───
+    const isClientBill = invoice.type === 'client_bill';
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.roundedRect(companyX - 70, 50, 70, 24, 2, 2, 'FD');
+
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.text(invoice.type === 'client_bill' ? 'BILL TO:' : 'PAYOUT TO:', 20, 55);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoice.recipient_name, 20, 62);
+    doc.setTextColor(...mutedSlate);
+    doc.text(isClientBill ? 'BILL TO' : 'PAYOUT TO', companyX - 65, 57);
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...brandSlate);
+    // Auto-wrap recipient name
+    const splitRecipient = doc.splitTextToSize(invoice.recipient_name, 60);
+    doc.text(splitRecipient, companyX - 65, 65);
 
     // ─── Table ───
     const tableData = invoice.items.map(item => [
@@ -55,66 +130,110 @@ export const generateInvoicePDF = async (invoice: Invoice, profile: Partial<User
     ]);
 
     autoTable(doc, {
-        startY: 75,
-        head: [['Description', 'Qty', 'Unit Price', 'Total']],
+        startY: 85,
+        head: [['DESCRIPTION', 'QTY', 'PRICE', 'TOTAL']],
         body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229] }, // indigo-600
-        styles: { fontSize: 10, cellPadding: 5 },
-        margin: { left: 20, right: 20 }
+        theme: 'plain',
+        headStyles: { 
+            fillColor: [241, 245, 249], 
+            textColor: brandIndigo, 
+            fontStyle: 'bold', 
+            fontSize: 9,
+            cellPadding: { top: 6, bottom: 6, left: 4, right: 4 }
+        },
+        styles: { 
+            fontSize: 10, 
+            textColor: brandSlate, 
+            cellPadding: { top: 6, bottom: 6, left: 4, right: 4 }
+        },
+        alternateRowStyles: {
+            fillColor: [252, 253, 255]
+        },
+        margin: { left: 20, right: 20 },
+        willDrawCell: function (data) {
+            // Add a subtle bottom border to body cells
+            if (data.row.section === 'body') {
+                doc.setDrawColor(241, 245, 249);
+                doc.setLineWidth(0.5);
+                doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+            }
+        }
     });
 
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
+
+    // ─── Total Block ───
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(companyX - 70, finalY, 70, 20, 2, 2, 'F');
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...mutedSlate);
+    doc.text('TOTAL AMOUNT', companyX - 65, finalY + 13);
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...brandEmerald);
+    doc.text(formatCurrency(invoice.total_amount, invoice.currency), companyX - 5, finalY + 13, { align: 'right' });
 
     // ─── Note ───
     if (invoice.note) {
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text('Note:', 20, finalY);
+        doc.setTextColor(...brandIndigo);
+        doc.text('NOTE', 20, finalY + 5);
+        
         doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...mutedSlate);
+        const splitNote = doc.splitTextToSize(invoice.note, pageWidth - 120); // allow room for total box
+        doc.text(splitNote, 20, finalY + 11);
         
-        // Split text to fit page width
-        const splitNote = doc.splitTextToSize(invoice.note, pageWidth - 40);
-        doc.text(splitNote, 20, finalY + 5);
-        
-        // Adjust finalY based on note lines
-        finalY += (splitNote.length * 5) + 10;
+        finalY = Math.max(finalY + 20, finalY + (splitNote.length * 6) + 10);
+    } else {
+        finalY = finalY + 30;
     }
-
-    // ─── Total ───
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    const totalText = `TOTAL: ${formatCurrency(invoice.total_amount, invoice.currency)}`;
-    doc.text(totalText, pageWidth - 20, finalY + 10, { align: 'right' });
 
     // ─── Signature ───
     if (profile.signatureURL) {
         try {
-            const signatureY = finalY + 30;
-            doc.setFontSize(10);
-            doc.text('Authorized Signature:', 20, signatureY);
+            const signatureY = finalY + 10;
             
-            // Add signature image (fetch as base64 first to avoid async rendering issues in jsPDF)
+            // Draw an ultra-light gray box to establish signature region
+            doc.setFillColor(248, 250, 252);
+            doc.roundedRect(20, signatureY, 60, 30, 2, 2, 'F');
+            
+            // Add signature image
             const base64Img = await getBase64ImageFromUrl(profile.signatureURL);
+            doc.addImage(base64Img, 'PNG', 25, signatureY + 2, 50, 20);
             
-            // Draw a subtle dark background rectangle for the signature so white text is visible
-            doc.setFillColor(30, 41, 59); // Tailwind slate-800 equivalent
-            doc.roundedRect(18, signatureY + 3, 44, 24, 2, 2, 'F');
+            // Line and Text
+            const lineY = signatureY + 24;
+            doc.setDrawColor(203, 213, 225); // slate-300
+            doc.line(22, lineY, 78, lineY);
             
-            doc.addImage(base64Img, 'PNG', 20, signatureY + 5, 40, 20);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...brandSlate);
+            doc.text(profile.fullName || profile.displayName || 'Authorized Signatory', 50, lineY + 4, { align: 'center' });
             
-            const lineY = signatureY + 28;
-            doc.line(20, lineY, 80, lineY);
-            doc.text(profile.fullName || profile.displayName || '', 20, lineY + 5);
         } catch (err) {
             console.error('Error adding signature to PDF:', err);
         }
     }
 
     // ─── Footer ───
+    const footerY = doc.internal.pageSize.height - 15;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, footerY - 5, pageWidth - 20, footerY - 5);
+    
     doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text('Thank you for your business!', pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...mutedSlate);
+    doc.text('THANK YOU FOR YOUR BUSINESS', pageWidth / 2, footerY + 2, { 
+        align: 'center',
+        charSpace: 2 // Widened letter spacing for modern feel
+    });
 
+    // ─── Save ───
     doc.save(`Invoice_${invoice.invoice_number}.pdf`);
 };
