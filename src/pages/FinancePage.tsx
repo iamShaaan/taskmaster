@@ -703,12 +703,12 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
     const [savType] = useState<'savings' | 'investment'>('savings');
     const [savCurrency, setSavCurrency] = useState<CurrencyCode>('BDT');
 
-    // EMI Form State
+    // Subscription Form State
     const [emiTitle, setEmiTitle] = useState('');
-    const [emiMonthly, setEmiMonthly] = useState('');
-    const [emiTotal, setEmiTotal] = useState('');
-    const [emiDueDay, setEmiDueDay] = useState('1');
-    const [emiMonths] = useState('12');
+    const [emiAmount, setEmiAmount] = useState('');
+    const [emiBillingCycle, setEmiBillingCycle] = useState<'1_month' | '3_months' | '1_year'>('1_month');
+    const [emiPaymentMethod, setEmiPaymentMethod] = useState('');
+    const [emiNextDate, setEmiNextDate] = useState('');
     const [emiCurrency, setEmiCurrency] = useState<CurrencyCode>('BDT');
 
     // Real-time listener removed - now handled globally in App.tsx
@@ -743,7 +743,15 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
     }, [savings, displayCurrency, exchangeRates]);
 
     const emiMonthlyTotal = useMemo(() => {
-        return emis.reduce((acc, e) => acc + (exchangeRates ? convertCurrency(e.monthly_amount, e.currency || 'EUR', displayCurrency, exchangeRates) : e.monthly_amount), 0);
+        return emis.reduce((acc, e) => {
+            let equivalentMonthly = 0;
+            const rawAmount = e.amount || e.monthly_amount || 0;
+            if (e.billing_cycle === '3_months') equivalentMonthly = rawAmount / 3;
+            else if (e.billing_cycle === '1_year') equivalentMonthly = rawAmount / 12;
+            else equivalentMonthly = rawAmount;
+
+            return acc + (exchangeRates ? convertCurrency(equivalentMonthly, e.currency || 'EUR', displayCurrency, exchangeRates) : equivalentMonthly);
+        }, 0);
     }, [emis, displayCurrency, exchangeRates]);
 
     // Monthly Calculation for Breakdown
@@ -829,25 +837,24 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
 
     const handleAddEMI = async (e: React.FormEvent) => {
         e.preventDefault();
-        const monthly = parseFloat(emiMonthly);
-        const total = parseFloat(emiTotal);
-        if (!user || !emiTitle.trim() || isNaN(monthly)) return;
+        const amt = parseFloat(emiAmount);
+        if (!user || !emiTitle.trim() || isNaN(amt) || !emiNextDate) return;
 
         setIsSaving(true);
         try {
             await createDoc('emis', {
                 title: emiTitle.trim(),
-                monthly_amount: monthly,
-                total_amount: total || 0,
+                amount: amt,
                 currency: emiCurrency,
-                due_day: parseInt(emiDueDay),
-                remaining_months: parseInt(emiMonths),
+                billing_cycle: emiBillingCycle,
+                payment_method: emiPaymentMethod.trim(),
+                next_billing_date: emiNextDate,
                 start_date: todayStr,
                 owner_id: user.uid,
             });
-            setEmiTitle(''); setEmiMonthly(''); setEmiTotal('');
-            toast.success('EMI added');
-        } catch { toast.error('Failed to add EMI'); }
+            setEmiTitle(''); setEmiAmount(''); setEmiPaymentMethod(''); setEmiNextDate('');
+            toast.success('Subscription added');
+        } catch { toast.error('Failed to add Subscription'); }
         finally { setIsSaving(false); }
     };
 
@@ -910,7 +917,7 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
                                 : 'bg-slate-800/40 text-slate-500 border-2 border-transparent hover:bg-slate-800 hover:text-slate-300'
                         }`}
                     >
-                        {tab === 'emis' ? 'EMIs' : tab === 'new_invoice' ? 'New Invoice' : tab}
+                        {tab === 'emis' ? 'Subscriptions' : tab === 'new_invoice' ? 'New Invoice' : tab}
                     </button>
                 ))}
             </div>
@@ -1136,57 +1143,81 @@ export const FinancePage: React.FC<FinancePageProps> = ({ viewMode = 'dashboard'
 
                 {activeTab === 'emis' && (
                     <motion.div key="emis" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-                        <div className="bg-gradient-to-br from-red-500/20 to-orange-500/5 border border-red-500/20 rounded-3xl p-6 relative overflow-hidden">
+                        <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/5 border border-indigo-500/20 rounded-3xl p-6 relative overflow-hidden">
                             <div className="flex justify-between items-center mb-4">
-                                <CreditCard className="text-red-400" size={32} />
+                                <CreditCard className="text-indigo-400" size={32} />
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-red-500/60">Monthly EMI Load</p>
-                                    <p className="text-3xl font-black text-red-400 tabular-nums">{formatCurrency(emiMonthlyTotal, displayCurrency)}</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400/60">Equivalent Monthly Load</p>
+                                    <p className="text-3xl font-black text-indigo-400 tabular-nums">{formatCurrency(emiMonthlyTotal, displayCurrency)}</p>
                                 </div>
                             </div>
-                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-red-500/10 blur-[80px] rounded-full" />
+                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-500/10 blur-[80px] rounded-full" />
                         </div>
 
-                        <form onSubmit={handleAddEMI} className="space-y-3 bg-slate-800/40 p-5 rounded-3xl border border-slate-700/50">
-                            <p className="text-red-400 text-[10px] font-black uppercase tracking-tighter mb-2">New EMI / Loan Installment</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <input required value={emiTitle} onChange={e => setEmiTitle(e.target.value)} placeholder="EMI Title" className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-red-500/50" />
-                                <input required type="number" step="0.01" value={emiMonthly} onChange={e => setEmiMonthly(e.target.value)} placeholder="Monthly Amount" className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 outline-none focus:border-red-500/50" />
-                                <div className="flex gap-2">
-                                    <select value={emiCurrency} onChange={e => setEmiCurrency(e.target.value as CurrencyCode)} className="flex-1 bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2 text-[10px] font-black uppercase text-slate-400 outline-none">
+                        <form onSubmit={handleAddEMI} className="space-y-4 bg-slate-800/40 p-5 sm:p-6 rounded-3xl border border-slate-700/50">
+                            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-tighter mb-2">New Subscription</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <input required value={emiTitle} onChange={e => setEmiTitle(e.target.value)} placeholder="Service Title (e.g., Netflix)" className="lg:col-span-2 bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50" />
+                                <div className="flex gap-2 w-full lg:col-span-2">
+                                    <input required type="number" step="0.01" value={emiAmount} onChange={e => setEmiAmount(e.target.value)} placeholder="Amount" className="flex-1 min-w-[100px] bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 outline-none focus:border-indigo-500/50" />
+                                    <select value={emiCurrency} onChange={e => setEmiCurrency(e.target.value as CurrencyCode)} className="bg-slate-900 border border-slate-700/50 rounded-xl px-3 py-2 text-[10px] font-black uppercase text-slate-400 outline-none w-20 flex-shrink-0">
                                         {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
-                                    <input value={emiDueDay} type="number" min="1" max="31" onChange={e => setEmiDueDay(e.target.value)} placeholder="Day" className="w-20 bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-center font-mono outline-none" title="Due Day of Month" />
+                                </div>
+                                <select value={emiBillingCycle} onChange={e => setEmiBillingCycle(e.target.value as any)} className="bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50">
+                                    <option value="1_month">Monthly (1 Month)</option>
+                                    <option value="3_months">Quarterly (3 Months)</option>
+                                    <option value="1_year">Yearly (1 Year)</option>
+                                </select>
+                                <div className="relative">
+                                    <input list="payment-methods" required value={emiPaymentMethod} onChange={e => setEmiPaymentMethod(e.target.value)} placeholder="Payment Method" className="w-full bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500/50" />
+                                    <datalist id="payment-methods">
+                                        {Array.from(new Set(emis.map(e => e.payment_method).filter(Boolean))).map(pm => (
+                                            <option key={pm} value={pm} />
+                                        ))}
+                                    </datalist>
+                                </div>
+                                <div className="lg:col-span-2 flex flex-col justify-center">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 mb-1">First Deadline / Next Billing Date</label>
+                                    <input required type="date" value={emiNextDate} onChange={e => setEmiNextDate(e.target.value)} className="w-full bg-slate-900 border border-slate-700/50 rounded-xl px-4 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500/50" />
                                 </div>
                             </div>
-                            <button className="w-full bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-2xl text-xs transition-all shadow-lg shadow-red-500/20 uppercase tracking-widest">Register Installment</button>
+                            <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-3 rounded-2xl text-xs transition-all shadow-lg shadow-indigo-500/20 uppercase tracking-widest mt-2">Add Subscription</button>
                         </form>
 
                         <div className="space-y-3">
-                            {emis.map(e => (
+                            {emis.map(e => {
+                                const rawAmt = e.amount || e.monthly_amount || 0;
+                                const nextDateStr = e.next_billing_date 
+                                    ? format(new Date(e.next_billing_date), 'dd MMM yyyy') 
+                                    : (e.due_day ? format(setDateFns(addMonths(new Date(), 1), e.due_day), 'dd MMM yyyy') : 'Unknown');
+                                const cycleLabel = e.billing_cycle === '3_months' ? 'Quarterly' : e.billing_cycle === '1_year' ? 'Yearly' : 'Monthly';
+
+                                return (
                                 <div key={e.id} className="bg-slate-800/60 border border-slate-700/50 rounded-3xl p-5 flex flex-wrap sm:flex-nowrap justify-between items-center gap-4 group">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-slate-700/50 flex flex-col items-center justify-center border border-slate-600/30">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Day</span>
-                                            <span className="text-lg font-black text-slate-200 leading-none">{e.due_day}</span>
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex flex-col items-center justify-center border border-indigo-500/20 text-indigo-400">
+                                            <CalendarDays size={20} />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-slate-100">{e.title}</p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="px-2 py-0.5 rounded-full bg-slate-900 text-[10px] font-bold text-slate-500 border border-slate-700 uppercase">{e.remaining_months} months left</span>
-                                                <span className="text-slate-600 text-[10px] font-medium italic">Monthly auto-deduct simulation enabled</span>
+                                            <p className="font-bold text-slate-100 text-lg leading-tight">{e.title}</p>
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-900 text-[9px] font-black text-slate-400 border border-slate-700 uppercase">{cycleLabel}</span>
+                                                {e.payment_method && (
+                                                    <span className="text-slate-500 text-[10px] font-bold">via {e.payment_method}</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
                                         <div className="text-right">
-                                            <p className="text-red-400 font-black tabular-nums">{formatCurrency(e.monthly_amount, e.currency || 'EUR')}</p>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">Next: {format(setDateFns(addMonths(new Date(), 1), e.due_day), 'dd MMM')}</p>
+                                            <p className="text-slate-100 font-black tabular-nums">{formatCurrency(rawAmt, e.currency || 'EUR')}</p>
+                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1 text-amber-400/80">Next: {nextDateStr}</p>
                                         </div>
-                                        <button onClick={() => deleteDocById('emis', e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400 p-2 bg-slate-900 rounded-xl"><Trash2 size={14} /></button>
+                                        <button onClick={() => deleteDocById('emis', e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400 p-2 bg-slate-900 border border-slate-700/50 rounded-xl shadow-sm"><Trash2 size={14} /></button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     </motion.div>
                 )}

@@ -257,11 +257,25 @@ export interface SavingEntry {
 export interface EMIEntry {
     id: string;
     title: string;
-    total_amount: number;
-    monthly_amount: number;
+    
+    // Subscription primary amount
+    amount?: number; 
+
+    // Legacy amounts for backward compatibility
+    total_amount?: number;
+    monthly_amount?: number;
+    
     currency: CurrencyCode;
-    due_day: number;        // 1-31
-    remaining_months: number;
+    
+    // Flexible billing data
+    billing_cycle?: '1_month' | '3_months' | '1_year';
+    payment_method?: string;
+    next_billing_date?: string; // "YYYY-MM-DD"
+    
+    // Legacy mapping dates
+    due_day?: number;        // 1-31
+    remaining_months?: number;
+    
     start_date: string;
     owner_id: string;
     created_at: Date;

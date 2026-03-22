@@ -2,14 +2,18 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckSquare, Calendar, Users, FolderKanban, Timer,
-    TrendingUp, Clock, ArrowRight, Flame, CircleCheck, AlertCircle, Loader2, UserPlus
+    TrendingUp, Clock, ArrowRight, Flame, CircleCheck, AlertCircle, Loader2, UserPlus, Square
 } from 'lucide-react';
+import { auth } from '../firebase/config';
+import { useTimer } from '../hooks/useTimer';
 import { useAppStore } from '../store';
 import { formatDuration, formatDateTime } from '../utils/timeFormat';
 import { statusBadge, priorityBadge } from '../components/ui/Badge';
 import { Link } from 'react-router-dom';
 import { Modal } from '../components/ui/Modal';
 import { ClientForm } from '../components/clients/ClientForm';
+import { format, addMonths, setDate as setDateFns, isPast, isToday, differenceInDays } from 'date-fns';
+import { updateDocById } from '../firebase/firestore';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({
@@ -52,11 +56,52 @@ const StatCard = ({
     </div>
 );
 
+// ─── Active Timer Board ───────────────────────────────────────────────────────
+const ActiveTimerBoard = ({ task }: { task: import('../types').Task }) => {
+    const { elapsed, stop } = useTimer(task);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-indigo-600 border border-indigo-400/50 rounded-2xl p-4 sm:p-5 shadow-lg shadow-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-500/50 rounded-xl relative overflow-hidden">
+                    <div className="absolute inset-0 bg-white/20 animate-ping rounded-xl"></div>
+                    <Timer size={24} className="text-white relative z-10" />
+                </div>
+                <div>
+                    <h3 className="text-white font-bold text-lg leading-tight">{task.title}</h3>
+                    <p className="text-indigo-200 text-sm flex items-center gap-2 mt-0.5">
+                        {task.project_id && <span className="bg-indigo-500/30 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">Project Task</span>}
+                        <span className="flex items-center gap-1 font-medium"><Flame size={12} /> Actively Tracking</span>
+                    </p>
+                </div>
+            </div>
+            <div className="flex items-center gap-4 sm:gap-6 mt-2 sm:mt-0 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="text-right">
+                    <p className="text-3xl font-black text-white tabular-nums tracking-tight">
+                        {formatDuration(elapsed)}
+                    </p>
+                </div>
+                <button
+                    onClick={stop}
+                    className="flex items-center justify-center p-3 rounded-xl bg-red-500/20 hover:bg-red-500/40 text-red-100 hover:text-white border border-red-500/30 transition-all group shadow-sm flex-shrink-0"
+                    title="Stop Timer"
+                >
+                    <Square size={20} className="fill-current" />
+                </button>
+            </div>
+        </motion.div>
+    );
+};
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export const Dashboard: React.FC = () => {
     // ✅ Read from store only — App.tsx DataLoader owns all Firestore subscriptions.
     //    No duplicate listeners here.
-    const { tasks, meetings, clients, projects } = useAppStore();
+    const { tasks, meetings, clients, projects, emis } = useAppStore();
     const [showClientForm, setShowClientForm] = React.useState(false);
 
     // Loading: store starts as empty arrays; show skeleton state if nothing loaded yet
@@ -64,6 +109,11 @@ export const Dashboard: React.FC = () => {
 
     // ─ Memoised derived values ─────────────────────────────────────────────────
     const now = useMemo(() => new Date(), []);
+
+    const activeTask = useMemo(
+        () => tasks.find(t => t.active_timer && t.active_timer.user_id === auth.currentUser?.uid),
+        [tasks]
+    );
 
     const openTasks = useMemo(
         () => tasks.filter(t => t.status === 'open' || t.status === 'in_progress'),
@@ -109,8 +159,84 @@ export const Dashboard: React.FC = () => {
         return Math.round((doneTasks.length / tasks.length) * 100);
     }, [tasks.length, doneTasks.length]);
 
+    const dueSubscriptions = useMemo(() => {
+        const threshold = new Date(now);
+        threshold.setDate(threshold.getDate() + 5);
+        threshold.setHours(23, 59, 59, 999);
+
+        return emis.filter(e => {
+            const dateStr = e.next_billing_date 
+                ? e.next_billing_date 
+                : (e.due_day ? format(setDateFns(addMonths(new Date(), e.due_day >= now.getDate() ? 0 : 1), e.due_day), 'yyyy-MM-dd') : null);
+            if (!dateStr) return false;
+            
+            const nextDate = new Date(dateStr);
+            return nextDate <= threshold;
+        }).map(e => {
+            const dateStr = e.next_billing_date 
+                ? e.next_billing_date 
+                : (e.due_day ? format(setDateFns(addMonths(new Date(), e.due_day >= now.getDate() ? 0 : 1), e.due_day), 'yyyy-MM-dd') : '');
+            return { ...e, computedNextDate: new Date(dateStr) };
+        }).sort((a, b) => a.computedNextDate.getTime() - b.computedNextDate.getTime());
+    }, [emis, now]);
+
+    const handleMarkSubscriptionPaid = async (sub: any) => {
+        try {
+            const nextDate = new Date(sub.computedNextDate);
+            let addedMonths = 1;
+            if (sub.billing_cycle === '3_months') addedMonths = 3;
+            else if (sub.billing_cycle === '1_year') addedMonths = 12;
+            
+            const newNextDate = addMonths(nextDate, addedMonths);
+            
+            await updateDocById('emis', sub.id, {
+                next_billing_date: format(newNextDate, 'yyyy-MM-dd')
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     return (
         <div className="space-y-6">
+            {/* ── Active Task Timer Board ────────────────────────────────────── */}
+            {activeTask && <ActiveTimerBoard task={activeTask} />}
+
+            {/* ── Subscriptions Due Notification ─────────────────────────────── */}
+            {dueSubscriptions.length > 0 && (
+                <div className="space-y-3">
+                    {dueSubscriptions.map(sub => {
+                        const isLate = isPast(sub.computedNextDate) && !isToday(sub.computedNextDate);
+                        const daysLeft = Math.max(0, differenceInDays(sub.computedNextDate, now));
+                        
+                        return (
+                        <motion.div
+                            key={sub.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`flex items-center gap-3 p-4 border rounded-2xl ${isLate ? 'bg-red-500/10 border-red-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}
+                        >
+                            <AlertCircle size={18} className={`flex-shrink-0 ${isLate ? 'text-red-400' : 'text-amber-400'}`} />
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-bold ${isLate ? 'text-red-300' : 'text-amber-300'}`}>
+                                    Subscription Due: {sub.title}
+                                </p>
+                                <p className={`text-xs truncate ${isLate ? 'text-red-500/70' : 'text-amber-500/70'}`}>
+                                    {isLate ? 'Overdue!' : daysLeft === 0 ? 'Due Today' : `Due in ${daysLeft} day${daysLeft > 1 ? 's' : ''}`} • {format(sub.computedNextDate, 'dd MMM yyyy')}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => handleMarkSubscriptionPaid(sub)}
+                                className={`text-xs font-bold flex-shrink-0 flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg ${isLate ? 'bg-red-500/20 text-red-200 hover:bg-red-500/40' : 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/40'}`}
+                                title="Mark as Paid"
+                            >
+                                <CheckSquare size={14} /> Paid
+                            </button>
+                        </motion.div>
+                    )})}
+                </div>
+            )}
+
             {/* ── Stat Cards ───────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <StatCard
