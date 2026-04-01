@@ -7,7 +7,7 @@ interface ChecklistHeatmapProps {
     dailyLogs: DailyLog[];
 }
 
-type DotStatus = 'green' | 'orange' | 'empty' | 'future' | 'outside';
+type DotStatus = 'deepgreen' | 'lightgreen' | 'empty' | 'future' | 'outside';
 
 export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ routines, dailyLogs }) => {
     const [hoveredDay, setHoveredDay] = useState<string | null>(null);
@@ -53,8 +53,8 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ routines, da
             const rate = Math.round((completed / total) * 100);
 
             let status: DotStatus = 'empty';
-            if (rate >= 100) status = 'green';
-            else if (rate >= 50) status = 'orange';
+            if (rate >= 100) status = 'deepgreen';
+            else if (rate >= 50) status = 'lightgreen';
 
             map[dateStr] = { completed, total, rate, status };
         });
@@ -88,20 +88,20 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ routines, da
 
     const getDotStyle = (status: DotStatus): string => {
         switch (status) {
-            case 'green':   return 'bg-emerald-700 shadow-[0_0_4px_rgba(4,120,87,0.4)]';
-            case 'orange':  return 'bg-orange-700 shadow-[0_0_4px_rgba(194,65,12,0.3)]';
-            case 'empty':   return 'bg-slate-800/80';
-            case 'future':  return 'bg-slate-800/30';
-            case 'outside': return 'bg-transparent';
-            default:        return 'bg-slate-800/80';
+            case 'deepgreen':  return 'bg-emerald-700 shadow-[0_0_4px_rgba(4,120,87,0.4)]';
+            case 'lightgreen': return 'bg-emerald-400/70 shadow-[0_0_4px_rgba(52,211,153,0.25)]';
+            case 'empty':      return 'bg-slate-800/80';
+            case 'future':     return 'bg-slate-800/30';
+            case 'outside':    return 'bg-transparent';
+            default:           return 'bg-slate-800/80';
         }
     };
 
     const getTooltipColor = (status: DotStatus): string => {
         switch (status) {
-            case 'green':  return 'text-emerald-400';
-            case 'orange': return 'text-orange-400';
-            default:       return 'text-slate-500';
+            case 'deepgreen':  return 'text-emerald-400';
+            case 'lightgreen': return 'text-emerald-300';
+            default:           return 'text-slate-500';
         }
     };
 
@@ -117,7 +117,7 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ routines, da
                 <div className="flex items-center gap-1.5">
                     <span className="text-slate-600 text-[10px]">Less</span>
                     <div className="w-[9px] h-[9px] rounded-[2px] bg-slate-800/80" />
-                    <div className="w-[9px] h-[9px] rounded-[2px] bg-orange-700" />
+                    <div className="w-[9px] h-[9px] rounded-[2px] bg-emerald-400/70" />
                     <div className="w-[9px] h-[9px] rounded-[2px] bg-emerald-700" />
                     <span className="text-slate-600 text-[10px]">More</span>
                 </div>
