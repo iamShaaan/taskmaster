@@ -24,7 +24,7 @@ const navItems = [
 
 export const UserDataLayout: React.FC = () => {
     const { user } = useAuth();
-    const { tasks, projects, meetings } = useAppStore();
+    const { tasks, projects, meetings, routines, dailyLogs } = useAppStore();
     const location = useLocation();
 
     // Profile State
@@ -200,6 +200,8 @@ export const UserDataLayout: React.FC = () => {
                         profile={profile}
                         stats={stats}
                         onEdit={() => setIsEditing(true)}
+                        routines={routines}
+                        dailyLogs={dailyLogs}
                     />
                 )}
             </div>

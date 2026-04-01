@@ -4,7 +4,8 @@ import {
     Zap, Clock, CheckCircle2, Camera, FileSignature, Save, Loader2,
     Edit3, Mail, ExternalLink, X, Plus, Layout, Trash2
 } from 'lucide-react';
-import type { UserProfile } from '../types';
+import type { UserProfile, Routine, DailyLog } from '../types';
+import { ChecklistHeatmap } from '../components/profile/ChecklistHeatmap';
 
 // Safe URL hostname extractor - never throws
 const getHostname = (url: string): string => {
@@ -28,6 +29,8 @@ interface DashboardViewProps {
     profile: Partial<UserProfile>;
     stats: Stats;
     onEdit: () => void;
+    routines: Routine[];
+    dailyLogs: DailyLog[];
 }
 
 interface EditViewProps {
@@ -44,7 +47,7 @@ interface EditViewProps {
 }
 
 // ─── Dashboard View (STABLE TOP-LEVEL COMPONENT) ─────────────────────────────
-export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit }) => (
+export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, onEdit, routines, dailyLogs }) => (
     <div className="space-y-8">
         {/* Header / Hero Section — Full Width */}
         <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 md:p-12 backdrop-blur-3xl relative overflow-hidden group">
@@ -145,6 +148,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ profile, stats, on
                 </div>
             </div>
         </div>
+
+        {/* Checklist Activity Heatmap */}
+        <ChecklistHeatmap routines={routines} dailyLogs={dailyLogs} />
 
         {/* Bottom Row: Signature & Company Info — Side by Side */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
