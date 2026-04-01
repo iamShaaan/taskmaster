@@ -127,8 +127,8 @@ export const AppShell: React.FC = () => {
                 </header>
 
                 {/* Main Content — keyed on location.key so each route change re-mounts the animation */}
-                <main className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden p-4 sm:p-6 pb-4 sm:pb-6 relative safe-area-bottom min-h-0" onClick={handleMainClick}>
-                    <div className="page-enter flex-1 flex flex-col min-h-0">
+                <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 pb-20 sm:pb-6 relative safe-area-bottom" onClick={handleMainClick}>
+                    <div className="page-enter h-full">
                         <Outlet />
                     </div>
                 </main>
