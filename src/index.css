@@ -92,6 +92,27 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* ── Mobile horizontal scroll for kanban ──────────────── */
+@media (max-width: 767px) {
+  .snap-x {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  .snap-x::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  .snap-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .snap-x::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 10px;
+  }
+}
+
 @layer utilities {
   .line-clamp-1 {
     overflow: hidden;

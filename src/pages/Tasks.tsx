@@ -118,7 +118,7 @@ export const Tasks: React.FC = () => {
             {/* Kanban View */}
             {view === 'kanban' && (
                 <DragDropContext onDragEnd={onDragEnd}>
-                    <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-x-hidden md:overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    <div className="flex-1 flex flex-row gap-4 md:gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent snap-x snap-mandatory md:snap-none">
                         {STATUS_COLUMNS.map(({ key, label, color }, idx) => {
                             const isOverdue = (t: Task) => t.due_date && new Date(t.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
                             const colTasks = filtered.filter((t) => {
@@ -132,7 +132,7 @@ export const Tasks: React.FC = () => {
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: idx * 0.1 }}
-                                    className="flex flex-col gap-4 w-full md:min-w-[320px] md:max-w-[320px]"
+                                    className="flex flex-col gap-4 min-w-[280px] max-w-[280px] md:min-w-[320px] md:max-w-[320px] snap-center shrink-0"
                                 >
                                     <div className={`flex items-center justify-between p-3 rounded-t-xl bg-slate-800/30 border-b-2 ${color.replace('border-', 'border-b-').replace('600', '400')}`}>
                                         <div className="flex items-center gap-2">
@@ -149,7 +149,7 @@ export const Tasks: React.FC = () => {
                                             <div
                                                 {...provided.droppableProps}
                                                 ref={provided.innerRef}
-                                                className="flex flex-col gap-4 flex-1 h-[400px] md:h-auto overflow-y-auto md:max-h-[calc(100vh-320px)] pr-2 custom-scrollbar min-h-[150px]"
+                                                className="flex flex-col gap-4 flex-1 overflow-y-auto max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-320px)] pr-2 custom-scrollbar min-h-[150px]"
                                             >
                                                 <AnimatePresence mode="popLayout">
                                                     {colTasks.map((task, index) => (
