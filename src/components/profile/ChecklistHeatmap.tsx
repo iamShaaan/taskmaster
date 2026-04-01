@@ -88,8 +88,8 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ routines, da
 
     const getDotStyle = (status: DotStatus): string => {
         switch (status) {
-            case 'deepgreen':  return 'bg-emerald-700 shadow-[0_0_4px_rgba(4,120,87,0.4)]';
-            case 'lightgreen': return 'bg-emerald-400/70 shadow-[0_0_4px_rgba(52,211,153,0.25)]';
+            case 'deepgreen':  return 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]';
+            case 'lightgreen': return 'bg-emerald-900/60';
             case 'empty':      return 'bg-slate-800/80';
             case 'future':     return 'bg-slate-800/30';
             case 'outside':    return 'bg-transparent';
@@ -117,8 +117,8 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ routines, da
                 <div className="flex items-center gap-1.5">
                     <span className="text-slate-600 text-[10px]">Less</span>
                     <div className="w-[9px] h-[9px] rounded-[2px] bg-slate-800/80" />
-                    <div className="w-[9px] h-[9px] rounded-[2px] bg-emerald-400/70" />
-                    <div className="w-[9px] h-[9px] rounded-[2px] bg-emerald-700" />
+                    <div className="w-[9px] h-[9px] rounded-[2px] bg-emerald-900/60" />
+                    <div className="w-[9px] h-[9px] rounded-[2px] bg-green-500" />
                     <span className="text-slate-600 text-[10px]">More</span>
                 </div>
             </div>
