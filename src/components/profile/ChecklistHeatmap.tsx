@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { format, eachDayOfInterval, getDay, isToday, isFuture, startOfWeek, endOfWeek } from 'date-fns';
+import { format, eachDayOfInterval, isToday, isFuture, startOfWeek, endOfWeek } from 'date-fns';
 import type { Routine, DailyLog } from '../../types';
 
 interface ChecklistHeatmapProps {
