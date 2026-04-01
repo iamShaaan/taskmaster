@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Calendar, Clock, Users, MapPin, Pencil, Trash2, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
+import { Plus, Calendar, Clock, Users, Link2, Pencil, Trash2, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
 import { useAppStore } from '../store';
 import { MeetingForm } from '../components/meetings/MeetingForm';
 import { Modal } from '../components/ui/Modal';
@@ -177,8 +177,16 @@ const MeetingCard = ({
                     <span>{formatDateTime(meeting.start_time)}</span>
                 </div>
                 {meeting.location && (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <MapPin size={11} /><span>{meeting.location}</span>
+                    <div className="flex items-center gap-1.5 text-xs">
+                        <Link2 size={11} className="text-indigo-400 flex-shrink-0" />
+                        <a
+                            href={meeting.location.startsWith('http') ? meeting.location : `https://${meeting.location}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2 truncate transition-colors"
+                        >
+                            Meeting Link
+                        </a>
                     </div>
                 )}
                 {meeting.participants?.length > 0 && (

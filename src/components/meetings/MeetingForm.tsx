@@ -130,8 +130,8 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({ onClose, editMeeting }
             )}
 
             <div>
-                <label className={labelCls}>Location</label>
-                <input className={inputCls} placeholder="Zoom / Office / Address" value={form.location} onChange={(e) => set('location', e.target.value)} />
+                <label className={labelCls}>Meeting Link</label>
+                <input className={inputCls} type="url" placeholder="https://zoom.us/j/... or https://meet.google.com/..." value={form.location} onChange={(e) => set('location', e.target.value)} />
             </div>
 
             {/* Participants */}
